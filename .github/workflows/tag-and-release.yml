@@ -53,7 +53,7 @@ jobs:
     needs: [retrieve-git-version]
     if: "contains(github.event.head_commit.message, '+tag')"
     outputs:
-      LatestTag: ${{needs.retrieve-git-version.outputs.GitVersionFullSemVer}}
+      LatestTag: ${{ needs.retrieve-git-version.outputs.GitVersionFullSemVer }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -61,8 +61,8 @@ jobs:
       - uses: actions/checkout@v2
       - uses: tvdias/github-tagger@v0.0.1
         with:
-          repo-token: "${{ secrets.GB_TOKEN }}"
-          tag: "${{needs.retrieve-git-version.outputs.GitVersionFullSemVer}}"
+          repo-token: ${{ secrets.GHTOKEN }}
+          tag: "${{ needs.retrieve-git-version.outputs.GitVersionFullSemVer }}"
 
   # Second, create a release and publish to PowershellGallery if so indicated in commit message
   # Note: I should cache the build directory and restore in a posterior job to decouple this step
@@ -99,8 +99,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "${{needs.tag-latest-commit.outputs.LatestTag}}"
-          token: ${{ secrets.GB_TOKEN }}
+          tag_name: "${{ needs.tag-latest-commit.outputs.LatestTag }}"
+          token: ${{ secrets.GHTOKEN }}
           files: "./Output/Release/*.zip"
 
       - name: Publish to PowershellGallery
