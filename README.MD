@@ -2,9 +2,8 @@
 
 A Powershell module to run threat hunting playbooks on data from Azure and O365 for Cloud Forensics purposes.
 
-[![tag-and-release Actions Status](https://github.com/darkquasar/AzureHunter/workflows/CI/badge.svg)](https://github.com/darkquasar/AzureHunter/actions)
-[![CI](https://github.com/darkquasar/AzureHunter/actions/workflows/tag-and-release.yml/badge.svg?event=status)](https://github.com/darkquasar/AzureHunter/actions/workflows/tag-and-release.yml)
-[![CI](https://github.com/darkquasar/AzureHunter/actions/workflows/tag-and-release.yml/badge.svg?event=release)](https://github.com/darkquasar/AzureHunter/actions/workflows/tag-and-release.yml)
+
+[![CI](https://github.com/darkquasar/AzureHunter/actions/workflows/tag-and-release.yml/badge.svg?branch=main)](https://github.com/darkquasar/AzureHunter/actions/workflows/tag-and-release.yml)
 [![PS Gallery](https://img.shields.io/badge/install-PS%20Gallery-blue.svg)](https://www.powershellgallery.com/packages/AzureHunter/)
 [![Coverage Status](https://coveralls.io/repos/github/darkquasar/AzureHunter/badge.svg?branch=master)](https://coveralls.io/github/darkquasar/AzureHunter?branch=master)
 [![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat)](http://AzureHunter.readthedocs.io/en/latest/?badge=latest)
