@@ -99,7 +99,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('Azure', 'DigitalForensics', 'CloudForensics', 'CyberSecurity', 'AzureSearcher', 'AzForensics', 'ThreatHunting', 'Powershellv5', 'DFIR', 'Digital Forensics', 'Azure-Forensics', 'Threat-Hunting', 'Incident-Response', 'UnifiedAuditLog')
+        Tags = @('Azure', 'DigitalForensics', 'CloudForensics', 'CyberSecurity', 'AzureSearcher', 'AzForensics', 'ThreatHunting', 'Powershellv5', 'DFIR', 'Digital-Forensics', 'Azure-Forensics', 'Threat-Hunting', 'Incident-Response', 'UnifiedAuditLog')
 
         # A URL to the license for this module.
         LicenseUri = 'https://raw.githubusercontent.com/darkquasar/AzureHunter/main/LICENSE'
