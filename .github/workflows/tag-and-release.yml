@@ -105,6 +105,6 @@ jobs:
 
       - name: Publish to PowershellGallery
         env:
-          PSGalleryNugetAPIKey: "${{ secrets.NugetApiKey }}"
+          PSGalleryNugetAPIKey: "${{ secrets.NUGETAPIKEY }}"
         if: "contains(github.event.head_commit.message, '+publish')"
         run: .\BuildModule.ps1 -BuildTask "PublishModule"
