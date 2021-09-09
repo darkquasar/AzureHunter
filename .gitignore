@@ -1,0 +1,8 @@
+# AzureHunter
+/output/
+*-azurehunter-*
+*-azhunter-*
+/tests/test-data/*
+
+# VSCode
+.vscode
