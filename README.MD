@@ -35,7 +35,7 @@ Search-AzureCloudUnifiedLog -StartDate "2020-03-06T10:00:00" -EndDate "2020-06-0
 This command will: 
 - Search data between the dates in *StartDate* and *EndDate*
 - Implement a window of 12 hours between these dates, which will be used to sweep the entire length of the time interval (StartDate --> EndDate). This window will be **automatically reduced and adjusted** to provide the maximum amount of records within the window, thus ensuring higher quality of output. The time window slides sequentially until reaching the **EndDate**.
-- The `AggregatedResultsFlushSize` parameter speficies the batches of records that will be processed by downstream playbooks. We are telling **AzureHunter** here to process the batch of records once the total amount reaches 5000. This way, you can get results on the fly, without having to wait for hours until a huge span of records is exported to CSV files.
+- The `AggregatedResultsFlushSize` parameter speficies the batches of records that will be processed by downstream playbooks. We are telling **AzureHunter** here to process the batch of records once the total amount reaches **5000**. This way, you can get results on the fly, without having to wait for hours until a huge span of records is exported to CSV files.
 
 ### Example 2 | Run Hunting Playbooks on CSV File
 
