@@ -97,11 +97,21 @@ Function Search-AzureCloudUnifiedLog {
         [ValidateNotNullOrEmpty()]
         [int]$AggregatedResultsFlushSize=0,
 
-        [Parameter(
+        [Parameter( 
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
             Position=5,
+            HelpMessage='Maximum amount of records we want returned within our current time slice and Azure session. It is recommended this is left with the default 20k'
+        )]
+        [ValidateNotNullOrEmpty()]
+        [int]$ResultSizeUpperThreshold=20000,
+
+        [Parameter(
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=6,
             HelpMessage='The record type that you would like to return. For a list of available ones, check API documentation: https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype'
         )]
         [string]$AuditLogRecordType="All",
@@ -110,7 +120,7 @@ Function Search-AzureCloudUnifiedLog {
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
-            Position=6,
+            Position=7,
             HelpMessage='Based on the record type, there are different kinds of operations associated with them. Specify them here separated by commas, each value enclosed within quotation marks'
         )]
         [string[]]$AuditLogOperations,
@@ -119,7 +129,7 @@ Function Search-AzureCloudUnifiedLog {
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
-            Position=7,
+            Position=8,
             HelpMessage='The users you would like to investigate. If this parameter is not provided it will default to all users. Specify them here separated by commas, each value enclosed within quotation marks'
         )]
         [string]$UserIDs,
@@ -128,7 +138,7 @@ Function Search-AzureCloudUnifiedLog {
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
-            Position=8,
+            Position=9,
             HelpMessage='You can search the log using FreeText strings'
         )]
         [string]$FreeText,
@@ -137,7 +147,7 @@ Function Search-AzureCloudUnifiedLog {
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
-            Position=9,
+            Position=10,
             HelpMessage='This parameter will skip automatic adjustment of the TimeInterval windows between your Start and End Dates.'
         )]
         [ValidateNotNullOrEmpty()]
@@ -147,7 +157,7 @@ Function Search-AzureCloudUnifiedLog {
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
-            Position=10,
+            Position=11,
             HelpMessage='Whether to run this module with fake data'
         )]
         [ValidateNotNullOrEmpty()]
@@ -175,22 +185,25 @@ Function Search-AzureCloudUnifiedLog {
             $GetPSSessions = Get-PSSession | Select-Object -Property State, Name
             $ExOConnected = (@($GetPSSessions) -like '@{State=Opened; Name=ExchangeOnlineInternalSession*').Count -gt 0
             if($ExOConnected -ne "True") {
-                Connect-ExchangeOnline -UseMultithreading $True -ShowProgress $True
+                try {
+                    Connect-ExchangeOnline -UseMultithreading $True -ShowProgress $True
+                }
+                catch {
+                    $Logger.LogMessage("Could not connect to Exchange Online. Please run Connect-ExchangeOnline before running AzureHunter", "ERROR", $null, $_)
+                    break
+                }
             }
         }
-
-        
-
     }
 
     PROCESS {
 
         # Grab Start and End Timestamps
-        $TimeSlicer = [TimeStamp]::New($StartDate, $EndDate)
+        $TimeSlicer = [TimeStamp]::New($StartDate, $EndDate, $TimeInterval)
         $TimeSlicer.IncrementTimeSlice($TimeInterval)
 
         # Initialize Azure Searcher
-        $AzureSearcher = [AzureSearcher]::new($TimeSlicer)
+        $AzureSearcher = [AzureSearcher]::new($TimeSlicer, $ResultSizeUpperThreshold)
         $AzureSearcher.SetRecordType([AuditLogRecordType]::$AuditLogRecordType).SetOperations($AuditLogOperations).SetUserIds($UserIds).SetFreeText($FreeText) | Out-Null
         $Logger.LogMessage("AzureSearcher Settings | RecordType: $($AzureSearcher.RecordType) | Operations: $($AzureSearcher.Operations) | UserIDs: $($AzureSearcher.UserIds) | FreeText: $($AzureSearcher.FreeText)", "SPECIAL", $null, $null)
 
@@ -201,10 +214,10 @@ Function Search-AzureCloudUnifiedLog {
         $TimeWindowAdjustmentNumberOfAttempts = 1  # How many times the TimeWindowAdjustmentNumberOfAttempts should be attempted before proceeding to the next block
         $NumberOfAttempts = 1   # How many times a call to the API should be attempted before proceeding to the next block
         $ResultCountEstimate = 0 # Start with a value that triggers the time window reduction loop
-        $ResultSizeUpperThreshold = 20000 # Maximum amount of records we want returned within our current time slice
+        # $ResultSizeUpperThreshold --> Maximum amount of records we want returned within our current time slice and Azure session
         $ShouldExportResults = $true # whether results should be exported or not in a given loop, this flag helps determine whether export routines should run when there are errors or no records provided
         $TimeIntervalReductionRate = 0.2 # the percentage by which the time interval is reduced until returned results is within $ResultSizeUpperThreshold
-        $FirstOptimalTimeIntervalCheck = $false # whether we should perform the initial optimal timeslice check when looking for automatic time window reduction
+        $FirstOptimalTimeIntervalCheckDone = $false # whether we should perform the initial optimal timeslice check when looking for automatic time window reduction, it's initial value is $false because it means it hasn't yet been performed
         [System.Collections.ArrayList]$Script:AggregatedResults = @()
 
         $Logger.LogMessage("Upper Log ResultSize Threshold for each Batch: $ResultSizeUpperThreshold", "SPECIAL", $null, $null)
@@ -217,159 +230,119 @@ Function Search-AzureCloudUnifiedLog {
             break
         }
 
+        # Search audit log between $TimeSlicer.StartTimeSlice and $TimeSlicer.EndTimeSlice
         while($TimeSlicer.StartTimeSlice -le $TimeSlicer.EndTime) {
+
+            # **** START: TIME WINDOW FLOW CONTROL ROUTINE **** #
+            # ************************************************* #
+            if($FirstOptimalTimeIntervalCheckDone -eq $false) {
+                # $AdjustmentMode = ProportionalAdjustment
+                # $AzureLogSearchSessionName = RandomSessionName
+                # $ResultCount = $null
+                $RandomSessionName = "azurehunter-$(Get-Random)"
+                $AzureSearcher.AdjustTimeInterval("ProportionalAdjustment", $RandomSessionName, $null)
+                if($TimeSlicer.InitialIntervalAdjusted -eq $True) {
+                    $FirstOptimalTimeIntervalCheckDone = $true
+                }
+                
+            }
+            # **** END: TIME WINDOW FLOW CONTROL ROUTINE **** #
+            # *********************************************** #
+
+            # **** START: DATA MINING FROM AZURE ROUTINE **** #
+            # *********************************************** #
 
             # Setup block variables
             $RandomSessionName = "azurehunter-$(Get-Random)"
             $NumberOfAttempts = 1
 
-            # Search audit log between $TimeSlicer.StartTimeSlice and $TimeSlicer.EndTimeSlice
-            # Only run this block once to determine optimal time interval (likely to be less than 30 min anyway)
-            # We need to avoid scenarios where the time interval initially setup by the user is less than 30 min
-            if((($ResultCountEstimate -eq 0) -xor ($ResultCountEstimate -gt $ResultSizeUpperThreshold)) -and -not $SkipAutomaticTimeWindowReduction -and -not ($TimeSlicer.IntervalAdjusted -eq $true)) {
-
-                # Run initial query to estimate results and adjust time intervals
-                try {
-                    $Logger.LogMessage("Initial TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
-                    $Logger.LogMessage("Querying Azure to estimate initial result size", "INFO", $null, $null)
-
-                    $Script:Results = $AzureSearcher.SearchAzureAuditLog($RandomSessionName)
-                }
-                catch [System.Management.Automation.RemoteException] {
-                    $Logger.LogMessage("Failed to query Azure API during initial ResultCountEstimate. Please check passed parameters and Azure API error", "ERROR", $null, $_)
-                    break
-                }
-                catch {
-                    Write-Host "ERROR ON: $_"
-                    if($TimeWindowAdjustmentNumberOfAttempts -lt 3) {
-                        $Logger.LogMessage("Failed to query Azure API during initial ResultCountEstimate: Attempt $TimeWindowAdjustmentNumberOfAttempts of 3. Trying again", "ERROR", $null, $_)
-                        $TimeWindowAdjustmentNumberOfAttempts++
-                        continue
-                    }
-                    else {
-                        $Logger.LogMessage("Failed to query Azure API during initial ResultCountEstimate: Attempt $TimeWindowAdjustmentNumberOfAttempts of 3. Exiting...", "ERROR", $null, $null)
-                        break
-                    }
-                }
-                
-                # Now check whether we got any results back, if not, then there are no results for this particular 
-                # timewindow. We need to increase timewindow and start again.
-                try {
-                    $ResultCountEstimate = $Script:Results[0].ResultCount
-                    $Logger.LogMessage("Initial Result Size estimate: $ResultCountEstimate", "INFO", $null, $null)
-                }
-                catch {
-                    $Logger.LogMessage("No results were returned with the current parameters within the designated time window. Increasing timeslice.", "LOW", $null, $null)
-                    $TimeSlicer.IncrementTimeSlice($TimeInterval)
-                    continue
-                }
-
-
-                # Check if the ResultEstimate is within expected limits.
-                # If it is, then break and proceed to log extraction process with new timeslice
-                if($ResultCountEstimate -le $ResultSizeUpperThreshold) {
-                    $Logger.LogMessage("Result Size estimate with new time interval value: $ResultCountEstimate", "INFO", $null, $null)
-                    $TimeSlicer.IntervalAdjusted = $true
-                    continue
-                }
-
-                # This OptimalTimeIntervalCheck helps shorten the time it takes to arrive to a proper time window 
-                # within the expected ResultSize window
-                if($FirstOptimalTimeIntervalCheck -eq $false) {
-                    $Logger.LogMessage("Estimating Optimal Hourly Time Interval...", "DEBUG", $null, $null)
-                    $OptimalTimeSlice = ($ResultSizeUpperThreshold * $TimeInterval) / $ResultCountEstimate
-                    $OptimalTimeSlice = [math]::Round($OptimalTimeSlice, 3)
-                    $IntervalInMinutes = $OptimalTimeSlice * 60
-                    $Logger.LogMessage("Estimated Optimal Hourly Time Interval: $OptimalTimeSlice ($IntervalInMinutes minutes). Reducing interval to this value...", "DEBUG", $null, $null)
-
-                    $TimeInterval = $OptimalTimeSlice
-                    $TimeSlicer.Reset()
-                    $TimeSlicer.IncrementTimeSlice($TimeInterval)
-                    $FirstOptimalTimeIntervalCheck = $true
-                    continue
-                }
-                else {
-                    $AdjustedHourlyTimeInterval = $TimeInterval - ($TimeInterval * $TimeIntervalReductionRate)
-                    $AdjustedHourlyTimeInterval = [math]::Round($AdjustedHourlyTimeInterval, 3)
-                    $IntervalInMinutes = $AdjustedHourlyTimeInterval * 60
-                    $Logger.LogMessage("Size of results is too big. Reducing Hourly Time Interval by $TimeIntervalReductionRate to $AdjustedHourlyTimeInterval hours ($IntervalInMinutes minutes)", "INFO", $null, $null)
-                    $TimeInterval = $AdjustedHourlyTimeInterval
-                    $TimeSlicer.Reset()
-                    $TimeSlicer.IncrementTimeSlice($TimeInterval)
-                    continue
-                } 
-
-            }
-
-            # We need the result cumulus to keep track of the batch of 50k logs
-            # These logs will get sort by date and the last date used as the new $StartTimeSlice value
+            # We need the result cumulus to keep track of the batch of ResultSizeUpperThreshold logs (20k by default)
+            # These logs will then get sort by date and the last date used as the new $StartTimeSlice value
             [System.Collections.ArrayList]$Script:ResultCumulus = @()
 
             # ***  RETURN LARGE SET LOOP ***
             # Loop through paged results and extract all of them sequentially, before going into the next TimeSlice cycle
-            # PROBLEM: the problem with this approach is that at some point Azure would start returning result indices 
-            # that were not sequential and thus messing up the script. However this is the best way to export the highest
-            # amount of logs within a given timespan. So the 
-            # solution should be to implement a check and abort log exporting when result index stops being sequential. 
 
-            while(($Script:Results.Count -ne 0) -or ($ShouldRunReturnLargeSetLoop -eq $true) -or ($NumberOfAttempts -le 3)) {
-
-                # Debug
-                #DEBUG $Logger.LogMessage("ResultIndex End: $EndResultIndex", "DEBUG", $null, $null)
-                #DEBUG $LastLogJSON = ($Results[($Results.Count - 1)] | ConvertTo-Json -Compress).ToString()
-                #DEBUG $Logger.LogMessage($LastLogJSON, "LOW", $null, $null)
+            while(
+                    ($Script:Results.Count -ne 0) -or 
+                    ($ShouldRunReturnLargeSetLoop -eq $true) -or 
+                    ($NumberOfAttempts -le 3)
+                ) {
+                # NOTE: when the ShouldRunReturnLargeSetLoop variable is set, it means we need to continue requesting logs within the same session until we have exhausted all available logs in the Azure Session. This means that for large datasets, the AggregatedResultsFlushSize parameter won't count unless we reduce the size of ResultSizeUpperThreshold below that of AggregatedResultsFlushSize
 
                 # Run for this loop
                 $Logger.LogMessage("Fetching next batch of logs. Session: $RandomSessionName", "LOW", $null, $null)
                 $Script:Results = $AzureSearcher.SearchAzureAuditLog($RandomSessionName)
-                #$Script:Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
 
                 # Test whether we got any results at all
-                # If we got results, we need to determine wether the ResultSize is too big
+                # If we got results, we need to determine wether the ResultSize is too big and run additional Data Consistency Checks
                 if($Script:Results.Count -eq 0) {
-                    $Logger.LogMessage("No more logs remaining in session $RandomSessionName", "LOW", $null, $null)
+                    $Logger.LogMessage("No more logs remaining in session $RandomSessionName. Exporting results and going into the next iteration...", "LOW", $null, $null)
                     $ShouldExportResults = $true
                     break
                 }
+                # We DID GET RESULTS. Let's run Data Consistency Checks before proceeding
                 else {
 
                     $ResultCountEstimate = $Script:Results[0].ResultCount
-                    $Logger.LogMessage("Batch Result Size: $ResultCountEstimate | Session: $RandomSessionName", "INFO", $null, $null)
+                    $Logger.LogMessage("Batch Result Size: $ResultCountEstimate | Session: $RandomSessionName", "LOW", $null, $null)
+
+                    # *** DATA CONSISTENCY CHECK 01: Log density within threshold *** #
+                    # *************************************************************** #
 
                     # Test whether result size is within threshold limits
                     # Since a particular TimeInterval does not guarantee it will produce the desired log density for
                     # all time slices (log volume varies in the enterprise throught the day)
-                    if((($ResultCountEstimate -eq 0) -or ($ResultCountEstimate -gt $ResultSizeUpperThreshold)) -and $AutomaticTimeWindowReduction) {
-                        $Logger.LogMessage("Result density is higher than the threshold of $ResultSizeUpperThreshold. Adjusting time intervals.", "DEBUG", $null, $null)
-                        # Reset timer flow control flags
-                        $TimeSlicer.IntervalAdjusted = $false
-                        $FirstOptimalTimeIntervalCheck = $false
-                        # Set results export flag
-                        $ShouldExportResults = $false
-                        $ShouldRunTimeWindowAdjustment = $true
-                        break
+                    # This check should not matter if the user selected to Skip Automatic TimeWindow Reduction.
+                    if(-not $SkipAutomaticTimeWindowReduction) {
+
+                        if($ResultCountEstimate -eq 0) {
+                            $Logger.LogMessage("Result density is ZERO. We need to try again. Attempt $NumberOfAttempts of 3", "DEBUG", $null, $null)
+                            # Set results export flag
+                            $ShouldExportResults = $false
+                            $NumberOfAttempts++
+                            continue
+                        }
+                        if($ResultCountEstimate -gt $ResultSizeUpperThreshold) {
+                            $Logger.LogMessage("Result density is HIGHER THAN THE THRESHOLD of $ResultSizeUpperThreshold. We need to adjust time intervals.", "DEBUG", $null, $null)
+                            $Logger.LogMessage("Time Interval prior to running adjustment: $($TimeSlicer.UserDefinedInitialTimeInterval)", "DEBUG", $null, $null)
+                            # Set results export flag
+                            $ShouldExportResults = $false
+                            
+                            $RandomSessionName = "azurehunter-$(Get-Random)"
+                            $AzureSearcher.AdjustTimeInterval("PercentageAdjustment", $RandomSessionName, $ResultCountEstimate)
+                            $Logger.LogMessage("Time Interval after running adjustment: $($TimeSlicer.UserDefinedInitialTimeInterval)", "DEBUG", $null, $null)
+                            break
+                        }
+                        # Else if results within Threshold limits
+                        else {
+                            $ShouldExportResults = $true
+                        }
                     }
-                    # Else if results within Threshold limits
-                    else {
-                        $ShouldExportResults = $true
-                    }
+                    
+                    
+                    # *** DATA CONSISTENCY CHECK 02: Sequential data consistency *** #
+                    # ************************************************************** #
+
+                    # PROBLEM WE TRIED TO SOLVE HERE: at some point Azure may start returning result indices that are not sequential and thus the results will (a) be inconsistent and (b) mess up with any script. However, using the ReturnLargeSet switch is the best way to export the highest amount of logs within a given timespan. So the solution was to implement a check and abort log exporting when result index stops being sequential.
 
                     # Tracking session and results for current and previous sessions
+                    # This will aid in checks below for log index integrity
                     if($CurrentSession){ $FormerSession = $CurrentSession } else {$FormerSession = $RandomSessionName}
                     $CurrentSession = $RandomSessionName
                     if($HighestEndResultIndex){ $FormerHighestEndResultIndex = $HighestEndResultIndex } else {$FormerHighestEndResultIndex = $EndResultIndex}
                     $StartResultIndex = $Script:Results[0].ResultIndex
                     $HighestEndResultIndex = $Script:Results[($Script:Results.Count - 1)].ResultIndex
-                    
 
                     # Check for Azure API and/or Powershell crazy behaviour when it goes back and re-exports duplicated results
-                    # Check (1): Is the current end record index lower than the previous end record index? --> YES --> then crazy shit
-                    # Check (2): Is the current end record index lower than the current start record index? --> YES --> then crazy shit
-                    # Only run this check within the same sessions (since comparing these parameters between different sessions will return erroneous checks)
+                    # Check (1): Is the current End Record Index lower than the previous End Record Index? --> YES --> then crazy shit, abort cycle and proceed with next iteration
+                    # Check (2): Is the current End Record Index lower than the current Start Record Index? --> YES --> then crazy shit, abort cycle and proceed with next iteration
+
+                    # Only run this check within the same session (since comparing these parameters between different sessions will return erroneous checks of course)
                     if($FormerSession -eq $CurrentSession) {
                         if (($HighestEndResultIndex -lt $FormerHighestEndResultIndex) -or ($StartResultIndex -gt $HighestEndResultIndex)) {
 
-                            $Logger.LogMessage("Azure API or Search-UnifiedAuditLog behaving weirdly and going back in time... Need to abort this cycle and proceed to next timeslice | CurrentSession = $CurrentSession | FormerSession = $FormerSession | FormerHighestEndResultIndex = $FormerHighestEndResultIndex | CurrentHighestEndResultIndex = $HighestEndResultIndex | StartResultIndex = $StartResultIndex |  Result Count = $($Script:Results.Count)", "ERROR", $null, $null)
+                            $Logger.LogMessage("Azure API or Search-UnifiedAuditLog behaving weirdly and going back in time... Need to abort this cycle and try again | CurrentSession = $CurrentSession | FormerSession = $FormerSession | FormerHighestEndResultIndex = $FormerHighestEndResultIndex | CurrentHighestEndResultIndex = $HighestEndResultIndex | StartResultIndex = $StartResultIndex |  Result Count = $($Script:Results.Count)", "ERROR", $null, $null)
                             
                             if($NumberOfAttempts -lt 3) {
                                 $RandomSessionName = "azurehunter-$(Get-Random)"
@@ -387,20 +360,22 @@ Function Search-AzureCloudUnifiedLog {
                 }
 
                 # Collate Results
+                # Append partial results to the ResultCumulus
+                # in preparation for deduping and sorting
                 $StartingResultIndex = $Script:Results[0].ResultIndex
                 $EndResultIndex = $Script:Results[($Script:Results.Count - 1)].ResultIndex
                 $Logger.LogMessage("Adding records $StartingResultIndex to $EndResultIndex", "INFO", $null, $null)
                 $Script:Results | ForEach-Object { $Script:ResultCumulus.add($_) | Out-Null }
 
             }
+            # **** END: DATA MINING FROM AZURE ROUTINE **** #
+            # ********************************************* #
 
+            # **** START: DATA POST-PROCESSING ROUTINE **** #
+            # ********************************************* #
             # If available results are bigger than the Threshold, then don't export logs
             if($ShouldExportResults -eq $false) {
-
-                if ($ShouldRunTimeWindowAdjustment) {
-                    # We need to adjust time window and start again
-                    continue
-                }
+                continue
             }
             else {
 
@@ -412,7 +387,7 @@ Function Search-AzureCloudUnifiedLog {
                         $Logger.LogMessage("Sorting and Deduplicating current batch Results", "LOW", $null, $null)
                         $ResultCountBeforeDedup = $Script:ResultCumulus.Count
                         $DedupedResults = $Script:ResultCumulus | Sort-Object -Property Identity -Unique
-                        # For some reason when assigning to $DedupedResults PSOBJECT, the .Count property does not return a value when there's only a single record
+                        # For some reason when assigning to $DedupedResults PSOBJECT, the .Count property does not return a value when there's only a single record, so we found a workaround
                         if($Script:ResultCumulus.Count -eq 1) {$ResultCountAfterDedup = 1} else {$ResultCountAfterDedup = $DedupedResults.Count}
                         $ResultCountDuplicates = $ResultCountBeforeDedup - $ResultCountAfterDedup
 
@@ -446,8 +421,6 @@ Function Search-AzureCloudUnifiedLog {
                             $AggResultCountAfterDedup = $Script:AggregatedResults.Count
                             $AggResultCountDuplicates = $AggResultCountBeforeDedup - $AggResultCountAfterDedup
                             $Logger.LogMessage("AGGREGATED RESULTS | Removed $AggResultCountDuplicates Duplicate Records from Aggregated Results", "SPECIAL", $null, $null)
-                            #$Logger.LogMessage("AGGREGATED RESULTS | EXPORTING Aggregated Results to $ExportFileName", "SPECIAL", $null, $null)
-                            #$Script:AggregatedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
                             Invoke-HuntAzureAuditLogs -Records $Script:AggregatedResults
 
                             # Count records so far
@@ -478,7 +451,10 @@ Function Search-AzureCloudUnifiedLog {
                         # Let's add an extra second so we avoid exporting logs that match the latest exported timestamps
                         # there is a risk we can loose a few logs by doing this, but it reduces duplicates significatively
                         $TimeSlicer.EndTimeSlice = $LastCreationDateRecord.AddSeconds(1).ToLocalTime()
-                        $TimeSlicer.IncrementTimeSlice($TimeInterval)
+
+                        # INCREASE TIME INTERVAL FOR NEXT CYCLE
+                        $TimeSlicer.IncrementTimeSlice($TimeSlicer.UserDefinedInitialTimeInterval)
+
                         $Logger.LogMessage("INCREMENTED TIMESLICE | Next TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
 
                         # Set flag to run ReturnLargeSet loop next time
@@ -490,7 +466,10 @@ Function Search-AzureCloudUnifiedLog {
                         $Logger.LogMessage("No logs found in current timewindow. Sliding to the next timeslice", "DEBUG", $null, $null)
                         # Let's add an extra second so we avoid exporting logs that match the latest exported timestamps
                         # there is a risk we can loose a few logs by doing this, but it reduces duplicates significatively
-                        $TimeSlicer.IncrementTimeSlice($TimeInterval)
+
+                        # INCREASE TIME INTERVAL FOR NEXT CYCLE
+                        $TimeSlicer.IncrementTimeSlice($TimeSlicer.UserDefinedInitialTimeInterval)
+
                         $Logger.LogMessage("INCREMENTED TIMESLICE | Next TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
 
                         # NOTE: We are missing here a routine to capture when $TimeSlicer.StartTimeSlice -ge $TimeSlicer.EndTime and we have results in the Aggregated Batch that have not reached the export threshold. Will need to move the exporting routine to a nested function so it can be invoked here to export the last batch before the end of the timespan.
@@ -502,6 +481,8 @@ Function Search-AzureCloudUnifiedLog {
                     $Logger.LogMessage("GENERIC ERROR", "ERROR", $null, $_)
                 }
             }
+            # **** END: DATA POST-PROCESSING ROUTINE **** #
+            # ********************************************* #
         }
     }
     END {

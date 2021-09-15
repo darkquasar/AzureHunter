@@ -8,7 +8,7 @@ $script:RelativeSourcePathName = 'Source' # Relative name of the directory where
 $script:SourcePath = Join-Path $BuildRoot $RelativeSourcePathName # Where to source our module manifest and files from
 $script:BuildOutputFolder = Join-Path $BuildRoot Output # Folder where the output of all build & release tasks will be placed
 $script:ReleaseDir = Join-Path $script:BuildOutputFolder Release # Folder where the release package or zip will be placed
-$script:BuildDestinationFolder = Join-Path $BuildOutputFolder $ModuleName # Folder inside $BuildOutputFolder where we will place our built artefacts
+$script:BuildDestinationFolder = Join-Path $BuildOutputFolder $ModuleName # Folder inside $BuildOutputFolder where we will place our built artefacts or final Module
 $script:ExcludedDirs = ( 'private', 'public', 'classes', 'enums' )
 
 # Let's provide stdout output with information on relevant environment context
@@ -18,7 +18,7 @@ Task ContextAwareness {
     Write-Build Yellow "[AzureHunter][Build] Full Source Path: $SourcePath"
     Write-Build Yellow "[AzureHunter][Build] CI/CD Output Folder: $BuildOutputFolder"
     Write-Build Yellow "[AzureHunter][Build] BuildRoot Directory is $BuildRoot"
-    Write-Build Yellow "[AzureHunter][Build] Build Directory is $BuildDestinationFolder"
+    Write-Build Yellow "[AzureHunter][Build] Module Build Directory inside BuildRoot is $BuildDestinationFolder"
     Write-Build Yellow "[AzureHunter][Build] Release Directory is $ReleaseDir"
     Write-Output "`n"
 
@@ -29,6 +29,8 @@ Task PreCleanBuildFolder {
     Write-Build Yellow "`n[AzureHunter][Build] Deleting Folder $BuildOutputFolder"
     $null = Remove-Item $BuildOutputFolder -Recurse -ErrorAction Ignore
     $null = New-Item -Type Directory -Path $BuildDestinationFolder
+    # Unregister repository
+    Unregister-PSRepository AzureHunterDemoRepo -Verbose -ErrorAction SilentlyContinue
 }
 
 # This task will compile all of the PS1 files into a cohesive PSM1 module file
@@ -41,7 +43,7 @@ Task CompilePSM {
         $BuildParams = @{}
         $GitVersion = gitversion | ConvertFrom-Json | Select-Object -Expand SemVer
         $BuildParams['SemVer'] = $GitVersion
-        Write-Build Yellow "`n[AzureHunter][Build] Build Version according to GitVersion: $($BuildParams["SemVer"])"
+        Write-Build Yellow "`n[AzureHunter][Build] Build Version according to GitVersion: $($BuildParams["SemVer"]). THIS IS THE VERSION THAT WILL BE PUBLISHED TO POWERSHELLGALLERY"
     }
     catch {
         Write-Host $Error[0]
@@ -155,6 +157,25 @@ Task PublishUnitTestsCoverage {
     Publish-Coverage -Coverage $Coverage
 }
 
+Task PublishLocalTestPackage {
+    # This task will register a local folder as a destination for a NuGet package and publish
+    # The current build to it so that it can be tested locally
+
+    $RepositoryName = "AzureHunterDemoRepo"
+    $RepositoryPath = Join-Path $script:BuildOutputFolder $RepositoryName
+    Write-Build Green "`n[AzureHunter][Test] Nugget Test Repo Destination Path $RepositoryPath"
+
+    if(!(Test-Path $RepositoryPath)) {
+        New-Item -Type Directory -Path $RepositoryPath
+    }
+    Register-PSRepository -Name $RepositoryName -SourceLocation $RepositoryPath -PublishLocation $RepositoryPath -InstallationPolicy Trusted
+    Publish-Module -Path $script:BuildDestinationFolder -Repository $RepositoryName -NuGetApiKey "TEST"
+
+    # To Test the package simply uninstall from previous locations and re-install from the local repository
+    # Install-Module AzureHunter -Repository AzureHunterDemoRepo -Scope CurrentUser
+    # Get-Module AzureHunter | fl
+}
+
 # This task will update the source Manifest File with the newly built one
 Task UpdateSource {
     Copy-Item $Global:CompileResult.Path -Destination "$SourcePath\$ModuleName.psd1"
@@ -184,4 +205,5 @@ Task PublishPackage {
 Task Default ContextAwareness, PreCleanBuildFolder, CompilePSM, CopyDependenciesToOutput, ZipOutput
 Task UpdateSourceManifest ContextAwareness, UpdateSource
 Task PublishModule ContextAwareness, PublishPackage
+Task TestBuildAndPublishModule Default, PublishLocalTestPackage
 Task TagLatestGitCommit GitTag

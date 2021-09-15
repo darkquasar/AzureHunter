@@ -6,10 +6,6 @@
     Description: This module contains some utilities to search through Azure and O365 unified audit log.
 #>
 
-using namespace AzureHunter.AzureSearcher
-using namespace AzureHunter.Logger
-using namespace AzureHunter.TimeStamp
-
 Function Invoke-HuntAzureAuditLogs {
     <#
     .SYNOPSIS
@@ -68,16 +64,34 @@ Function Invoke-HuntAzureAuditLogs {
 
         # Determine path to Playbooks folder
         # This is required to pre-load the Base Playbook "AzHunterBase" to do initial sanitization of logs
-        $ScriptPath = [System.IO.DirectoryInfo]::new($pwd)
-        $SourceFolderPresent = Get-ChildItem -Path $ScriptPath.FullName -Directory -Filter "source"
-        if($SourceFolderPresent){
-            $Script:PlaybooksPath = Join-Path $ScriptPath "source\playbooks"
+        if ($PSScriptRoot) {
+            $ScriptPath = [System.IO.DirectoryInfo]::new($PSScriptRoot)
+            if($ScriptPath.FullName -match "AzureHunter\\source"){
+                $ScriptPath = $ScriptPath.Parent
+                $Script:PlaybooksPath = Join-Path $ScriptPath.FullName "playbooks"
+            }
+            else {
+                $Script:PlaybooksPath = Join-Path $ScriptPath.FullName "playbooks"
+            }
         }
         else {
-            $Script:PlaybooksPath = Join-Path $ScriptPath playbooks
+            $ScriptPath = [System.IO.DirectoryInfo]::new($pwd)
+            $PlaybooksFolderPresent = Get-ChildItem -Path $ScriptPath.FullName -Directory -Filter "Playbooks"
+            if($PlaybooksFolderPresent){
+                $Script:PlaybooksPath = Join-Path $ScriptPath "playbooks"
+            }
+            else {
+                throw "Could not find Playbooks folder"
+            }
         }
+
         # Load Base Playbook
-        . "$Script:PlaybooksPath\AzHunter.Playbook.Base.ps1"
+        try {
+            . "$Script:PlaybooksPath\AzHunter.Playbook.Base.ps1"
+        }
+        catch {
+            $Logger.LogMessage("Could not load AzHunter.Playbook.Base", "ERROR", $null, $_)
+        }
 
         # Grab List of All Playbook File Paths
         [System.Collections.ArrayList]$PlaybookFileList = @()
@@ -114,12 +128,17 @@ Function Invoke-HuntAzureAuditLogs {
                 $PlaybookBaseName = $_.BaseName
                 $Logger.LogMessage("Evaluating Playbook $PlaybookBaseName", "INFO", $null, $null)
                 if($PlaybookBaseName -eq $Playbook) {
-                    . $_.FullName
-                    if($PassThru) {
-                        $ReturnRecords = Start-AzHunterPlaybook -Records $BasePlaybookRecords.AzureHuntersRecordsArray -PassThru
+                    try {
+                        . $_.FullName
+                        if($PassThru) {
+                            $ReturnRecords = Start-AzHunterPlaybook -Records $BasePlaybookRecords.AzureHuntersRecordsArray -PassThru
+                        }
+                        else {
+                            Start-AzHunterPlaybook -Records $BasePlaybookRecords.AzureHuntersRecordsArray
+                        }
                     }
-                    else {
-                        Start-AzHunterPlaybook -Records $BasePlaybookRecords.AzureHuntersRecordsArray
+                    catch {
+                        $Logger.LogMessage("Could not load Playbook $Playbook", "ERROR", $null, $_)
                     }
                 }
             }

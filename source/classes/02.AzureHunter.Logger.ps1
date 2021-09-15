@@ -76,10 +76,19 @@ class Logger {
 
         # Should we log an Error?
         if ($null -ne $LogErrorMessage) {
-            Write-Host $Error[0]
-            Write-Host $Error
             # Grab latest error namespace
-            $ErrorNameSpace = $Error[0].Exception.GetType().FullName
+            try {
+                $ErrorNameSpace = $Error[0].Exception.GetType().FullName
+            }
+            catch {
+                try {
+                    $ErrorNameSpace = $Error.Exception.GetType().FullName
+                }
+                catch {
+                    $ErrorNameSpace = "Undetermined"
+                }
+            }
+            
             # Add Error specific fields
             $LogRecord.Add("error_name_space", $ErrorNameSpace)
             $LogRecord.Add("error_script_line", $LogErrorMessage.InvocationInfo.ScriptLineNumber)
@@ -125,7 +134,7 @@ class Logger {
                 $this.BackgroundColor = "Green"
             }
             "Debug" {
-                $this.MessageColor = "Green"
+                $this.MessageColor = "Black"
                 $this.BackgroundColor = "DarkCyan"
             }
 

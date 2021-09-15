@@ -5,7 +5,8 @@ class TimeStamp {
     # Public Properties
     [float] $Interval
     [float] $IntervalInMinutes
-    [bool] $IntervalAdjusted
+    [float] $UserDefinedInitialTimeInterval # this is the value passed by the user when invoking Search-AzureCloudUnifiedLog
+    [bool] $InitialIntervalAdjusted
     [System.Globalization.CultureInfo] $Culture
     [DateTime] $StartTime
     [DateTime] $EndTime
@@ -17,10 +18,11 @@ class TimeStamp {
     [DateTime] $EndTimeSliceUTC
 
     # Default, Overloaded Constructor
-    TimeStamp([String] $StartTime, [String] $EndTime) {
+    TimeStamp([String] $StartTime, [String] $EndTime, [float] $UserDefinedInitialTimeInterval) {
         $this.Culture = New-Object System.Globalization.CultureInfo("en-AU")
         $this.StartTime = $this.ParseDateString($StartTime)
         $this.EndTime = $this.ParseDateString($EndTime)
+        $this.UserDefinedInitialTimeInterval = $UserDefinedInitialTimeInterval
         $this.UpdateUTCTimestamp()
     }
 
