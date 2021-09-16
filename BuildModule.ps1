@@ -38,7 +38,7 @@ ForEach($Module in $RequiredModules){
         }
         catch {
             Write-Output "`e[7;32m[AzureHunter][Build][+]`e[0m Module $Module not installed. Marked for installation"
-            $UninstalledModules.add($Module)
+            $UninstalledModules.add($Module) | Out-Null
         }
     }
 }

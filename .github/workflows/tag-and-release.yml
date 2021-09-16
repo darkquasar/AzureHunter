@@ -91,6 +91,7 @@ jobs:
         env:
           GitVersionTag: ${{ needs.retrieve-git-version.outputs.GitVersionSemVer }}
         run: |
+          choco install -y GitVersion.Portable --force
           .\BuildModule.ps1 -BuildTask "Default"
 
       - name: Output BuildModuleDir
