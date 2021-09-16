@@ -89,7 +89,7 @@ jobs:
       - name: Build Module
         id: build_module
         env:
-          GitVersionTag: ${{ needs.tag-latest-commit.outputs.LatestTag }}
+          GitVersionTag: ${{ needs.retrieve-git-version.outputs.GitVersionSemVer }}
         run: |
           .\BuildModule.ps1 -BuildTask "Default"
 

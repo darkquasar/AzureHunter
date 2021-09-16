@@ -24,7 +24,7 @@ Task ContextAwareness {
 
 # Let's clean the Output Directory so that it can host a new Build
 Task PreCleanBuildFolder {
-    Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Deleting Folder $BuildOutputFolder`e[0m"
+    Write-Build Yellow "`e[6;36m`n[AzureHunter][Build] Deleting Folder $BuildOutputFolder`e[0m"
     $null = Remove-Item $BuildOutputFolder -Recurse -ErrorAction Ignore
     $null = New-Item -Type Directory -Path $BuildDestinationFolder
     # Unregister repository
@@ -35,7 +35,7 @@ Task PreCleanBuildFolder {
 # that is referenced by the module manifest (your main .psd1 file)
 Task CompilePSM {
 
-    Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Compiling all code into a single PSM1`e[0m"
+    Write-Build Yellow "`e[6;36m`n[AzureHunter][Build] Compiling all code into a single PSM1`e[0m"
 
     # Configure Build Params for Build-Module
     $BuildParams = @{}
@@ -52,7 +52,7 @@ Task CompilePSM {
         }
     }
     catch {
-        Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Gitversion Raw Output: `e[0m"
+        Write-Build Yellow "`e[6;36m`n[AzureHunter][Build] Gitversion Raw Output: `e[0m"
         gitversion
         Write-Host $Error[0]
         Write-Warning -Message '`e[0;35mGitVersion not found, keeping the current version`e[0m'
@@ -78,7 +78,7 @@ Task ZipOutput {
 
     $BuildDir = $Global:CompileResult.ModuleBase
     $ZipDestinationPath = Join-Path $script:ReleaseDir "$($Global:CompileResult.Name)-v$($Global:CompileResult.Version).zip" 
-    Write-Build Green "`e[7;36m`n[AzureHunter][Release] Release Zip Destination Path $ZipDestinationPath`e[0m"
+    Write-Build Green "`e[6;36m`n[AzureHunter][Release] Release Zip Destination Path $ZipDestinationPath`e[0m"
     
 
     if(!(Test-Path $script:ReleaseDir)) {
@@ -101,7 +101,7 @@ Task ZipOutput {
 # RUN: locally after commiting and before pushing if you want to tag your commits before pushing
 Task GitTag {
 
-    Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Tagging latest commit`e[0m"
+    Write-Build Yellow "`e[6;36m`n[AzureHunter][Build] Tagging latest commit`e[0m"
     try {
         $BuildParams = @{}
         if((Get-Command -ErrorAction Stop -Name gitversion)) {
@@ -120,7 +120,7 @@ Task GitTag {
 # this task will take care of placing them in the output directory
 Task CopyDependenciesToOutput {
 
-    Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Copying any package dependencies to build directory $($Global:CompileResult.ModuleBase)`e[0m"
+    Write-Build Yellow "`e[6;36m`n[AzureHunter][Build] Copying any package dependencies to build directory $($Global:CompileResult.ModuleBase)`e[0m"
 
     Get-ChildItem -Path $SourcePath -File |
         Where-Object Name -NotMatch "$ModuleName\.ps[dm]1" |
@@ -173,7 +173,7 @@ Task PublishLocalTestPackage {
 
     $RepositoryName = "AzureHunterDemoRepo"
     $RepositoryPath = Join-Path $script:BuildOutputFolder $RepositoryName
-    Write-Build Green "`e[7;36m`n[AzureHunter][Test] Nugget Test Repo Destination Path $RepositoryPath`e[0m"
+    Write-Build Green "`e[6;36m`n[AzureHunter][Test] Nugget Test Repo Destination Path $RepositoryPath`e[0m"
 
     if(!(Test-Path $RepositoryPath)) {
         New-Item -Type Directory -Path $RepositoryPath

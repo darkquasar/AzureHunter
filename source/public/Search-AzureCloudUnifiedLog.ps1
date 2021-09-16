@@ -21,6 +21,20 @@ catch {
     . ".\AzHunter.Playbook.Base.ps1"
 }
 
+$AzureHunterLogo = @'
+                                    _    _             _            
+          /\                       | |  | |           | |           
+         /  \    _____   _ _ __ ___| |__| |_   _ _ __ | |_ ___ _ __ 
+        / /\ \  |_  / | | | '__/ _ \  __  | | | | '_ \| __/ _ \ '__|
+       / ____ \  / /| |_| | | |  __/ |  | | |_| | | | | ||  __/ |   
+      /_/    \_\/___|\__,_|_|  \___|_|  |_|\__,_|_| |_|\__\___|_|   
+                                                               
+         a powershell framework to run threat hunting playbooks on Azure data
+
+                      ╰(⇀︿⇀)つ-]═───> by Diego Perez (@darkquassar)                                  
+
+'@
+
 Function Search-AzureCloudUnifiedLog {
     <#
     .SYNOPSIS
@@ -165,6 +179,9 @@ Function Search-AzureCloudUnifiedLog {
     )
 
     BEGIN {
+
+        # Show Logo
+        Write-Host -ForegroundColor Green $AzureHunterLogo
 
         # *** Getting a handle to the running script path so that we can refer to it *** #
         if ($PSScriptRoot) {
