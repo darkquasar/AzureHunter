@@ -9,7 +9,7 @@ A Powershell module to run threat hunting playbooks on data from Azure and O365 
 [![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat)](http://AzureHunter.readthedocs.io/en/latest/?badge=latest)
 ![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AzureHunter)
 
-![azurehunter-demo-gif](.\media\azurehunter-gif-demo.gif)
+![azurehunter-demo-gif](https://github.com/darkquasar/AzureHunter/blob/5a94c58dbcb83cb2a153e73bebc568f1e3e96c57/media/azurehunter-gif-demo.gif)
 
 ## Getting Started
 
