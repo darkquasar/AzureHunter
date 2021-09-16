@@ -13,20 +13,18 @@ $script:ExcludedDirs = ( 'private', 'public', 'classes', 'enums' )
 
 # Let's provide stdout output with information on relevant environment context
 Task ContextAwareness {
-    Write-Build Yellow "[AzureHunter][Build] ModuleName is $ModuleName"
-    Write-Build Yellow "[AzureHunter][Build] Relative name of Source files: .\$RelativeSourcePathName"
-    Write-Build Yellow "[AzureHunter][Build] Full Source Path: $SourcePath"
-    Write-Build Yellow "[AzureHunter][Build] CI/CD Output Folder: $BuildOutputFolder"
-    Write-Build Yellow "[AzureHunter][Build] BuildRoot Directory is $BuildRoot"
-    Write-Build Yellow "[AzureHunter][Build] Module Build Directory inside BuildRoot is $BuildDestinationFolder"
-    Write-Build Yellow "[AzureHunter][Build] Release Directory is $ReleaseDir"
-    Write-Output "`n"
-
+    Write-Build Yellow ":robot: `e[7;32m[AzureHunter][Build]`e[0m ModuleName is $ModuleName"
+    Write-Build Yellow ":robot: `e[7;32m[AzureHunter][Build]`e[0m Relative name of Source files: .\$RelativeSourcePathName"
+    Write-Build Yellow ":robot: `e[7;32m[AzureHunter][Build]`e[0m Full Source Path: $SourcePath"
+    Write-Build Yellow ":robot: `e[7;32m[AzureHunter][Build]`e[0m CI/CD Output Folder: $BuildOutputFolder"
+    Write-Build Yellow ":robot: `e[7;32m[AzureHunter][Build]`e[0m BuildRoot Directory is $BuildRoot"
+    Write-Build Yellow ":robot: `e[7;32m[AzureHunter][Build]`e[0m Module Build Directory inside BuildRoot is $BuildDestinationFolder"
+    Write-Build Yellow ":robot: `e[7;32m[AzureHunter][Build]`e[0m Release Directory is $ReleaseDir"
 }
 
 # Let's clean the Output Directory so that it can host a new Build
 Task PreCleanBuildFolder {
-    Write-Build Yellow "`n[AzureHunter][Build] Deleting Folder $BuildOutputFolder"
+    Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Deleting Folder $BuildOutputFolder`e[0m"
     $null = Remove-Item $BuildOutputFolder -Recurse -ErrorAction Ignore
     $null = New-Item -Type Directory -Path $BuildDestinationFolder
     # Unregister repository
@@ -37,18 +35,30 @@ Task PreCleanBuildFolder {
 # that is referenced by the module manifest (your main .psd1 file)
 Task CompilePSM {
 
-    Write-Build Yellow "`n[AzureHunter][Build] Compiling all code into a single psm1"
+    Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Compiling all code into a single PSM1`e[0m"
 
+    # Configure Build Params for Build-Module
+    $BuildParams = @{}
     try {
-        $BuildParams = @{}
-        $GitVersion = gitversion | ConvertFrom-Json | Select-Object -Expand SemVer
-        $BuildParams['SemVer'] = $GitVersion
-        Write-Build Yellow "`n[AzureHunter][Build] Build Version according to GitVersion: $($BuildParams["SemVer"]). THIS IS THE VERSION THAT WILL BE PUBLISHED TO POWERSHELLGALLERY"
+        if($env:GitVersionTag) {
+            $BuildParams['SemVer'] = $GitVersion
+            Write-Build Yellow "`n[AzureHunter][Build] Found GITVERSION Environment Variable"
+            Write-Build Yellow "`e[0;35m`n[AzureHunter][Build] Build Version according to GitVersion Environment Variable: $($BuildParams["SemVer"]). THIS IS THE VERSION THAT WILL BE PUBLISHED TO POWERSHELLGALLERY`e[0m"
+        }
+        else {
+            $GitVersion = gitversion | ConvertFrom-Json | Select-Object -Expand SemVer
+            $BuildParams['SemVer'] = $GitVersion
+            Write-Build Yellow "`e[0;35m`n[AzureHunter][Build] Build Version according to GitVersion: $($BuildParams["SemVer"]). THIS IS THE VERSION THAT WILL BE PUBLISHED TO POWERSHELLGALLERY`e[0m"
+        }
     }
     catch {
+        Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Gitversion Raw Output: `e[0m"
+        gitversion
         Write-Host $Error[0]
-        Write-Warning -Message 'GitVersion not found, keeping the current version'
+        Write-Warning -Message '`e[0;35mGitVersion not found, keeping the current version`e[0m'
     }
+
+    
 
     Push-Location -Path "$BuildRoot\Source" -StackName 'InvokeBuildTask'
     $Global:CompileResult = Build-Module @BuildParams -Passthru
@@ -68,7 +78,7 @@ Task ZipOutput {
 
     $BuildDir = $Global:CompileResult.ModuleBase
     $ZipDestinationPath = Join-Path $script:ReleaseDir "$($Global:CompileResult.Name)-v$($Global:CompileResult.Version).zip" 
-    Write-Build Green "`n[AzureHunter][Release] Release Zip Destination Path $ZipDestinationPath"
+    Write-Build Green "`e[7;36m`n[AzureHunter][Release] Release Zip Destination Path $ZipDestinationPath`e[0m"
     
 
     if(!(Test-Path $script:ReleaseDir)) {
@@ -91,7 +101,7 @@ Task ZipOutput {
 # RUN: locally after commiting and before pushing if you want to tag your commits before pushing
 Task GitTag {
 
-    Write-Build Yellow "`n[AzureHunter][Build] Tagging latest commit"
+    Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Tagging latest commit`e[0m"
     try {
         $BuildParams = @{}
         if((Get-Command -ErrorAction Stop -Name gitversion)) {
@@ -110,7 +120,7 @@ Task GitTag {
 # this task will take care of placing them in the output directory
 Task CopyDependenciesToOutput {
 
-    Write-Build Yellow "`n[AzureHunter][Build] Copying any package dependencies to build directory $($Global:CompileResult.ModuleBase)"
+    Write-Build Yellow "`e[7;36m`n[AzureHunter][Build] Copying any package dependencies to build directory $($Global:CompileResult.ModuleBase)`e[0m"
 
     Get-ChildItem -Path $SourcePath -File |
         Where-Object Name -NotMatch "$ModuleName\.ps[dm]1" |
@@ -163,7 +173,7 @@ Task PublishLocalTestPackage {
 
     $RepositoryName = "AzureHunterDemoRepo"
     $RepositoryPath = Join-Path $script:BuildOutputFolder $RepositoryName
-    Write-Build Green "`n[AzureHunter][Test] Nugget Test Repo Destination Path $RepositoryPath"
+    Write-Build Green "`e[7;36m`n[AzureHunter][Test] Nugget Test Repo Destination Path $RepositoryPath`e[0m"
 
     if(!(Test-Path $RepositoryPath)) {
         New-Item -Type Directory -Path $RepositoryPath

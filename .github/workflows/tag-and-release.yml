@@ -88,8 +88,9 @@ jobs:
       # We must install GitVersion since it's used by some Build Tasks via Powershell InvokeBuild
       - name: Build Module
         id: build_module
+        env:
+          GitVersionTag: ${{ needs.tag-latest-commit.outputs.LatestTag }}
         run: |
-          choco install -y GitVersion.Portable
           .\BuildModule.ps1 -BuildTask "Default"
 
       - name: Output BuildModuleDir
