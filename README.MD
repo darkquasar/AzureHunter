@@ -18,6 +18,12 @@ Install from the PSGallery and Import the module
     Install-Module AzureHunter -Scope CurrentUser
     Import-Module AzureHunter
 
+## What is the UnifiedAuditLog?
+
+The unified audit log contains user, group, application, domain, and directory activities performed in the Microsoft 365 admin center or in the Azure management portal. For a complete list of Azure AD events, see the list of [RecordTypes](https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype).
+
+The UnifiedAuditLog is a great source of cloud forensic information since it contains a wealth of data on multiple types of cloud operations like ExchangeItems, SharePoint, Azure AD, OneDrive, Data Governance, Data Loss Prevention, Windows Defender Alerts and Quarantine events, Threat intelligence events in Microsoft Defender for Office 365 and the list goes on and on!
+
 ## Usage
 
 **AzureHunter** has two main commands: `Search-AzureCloudUnifiedLog` and `Invoke-HuntAzureAuditLogs`. 
@@ -58,7 +64,23 @@ Invoke-HuntAzureAuditLogs -Records $RecordArray -Playbooks 'AzHunter.Playbook.Ex
 ```
 
 ## Why?
-The majority of the tools out there at the moment, 
+Since the aftermath of the *SolarWinds Supply Chain Compromise* many tools have emerged out of deep forges of cyberforensicators, carefully developed by cyber blacksmith ninjas. These tools usually help you perform cloud forensics in Azure. My intention with AzureHunter is not to bring more noise to this crowded space, however, I found myself in the need to address some gaps that I have observed in some of the tools in the space (I might be wrong though, since there is a proliferation of tools out there and I don't know them all...):
+
+a. Azure cloud forensic tools don't usually address the complications of the Powershell API for the `UnifiedAuditLog`. This API is **very unstable and inconsistent** when exporting large quantities of data. I wanted to develop an interface that is fault tolerant (**enough**) to address some of these issues focusing solely on the *UnifiedAuditLog* since this is the Azure artefact that contains the most relevant and detailed activity logs for users, applications and services.
+b. Azure cloud forensic tools don't usually put focus on developing `Playbooks`. I wanted to come up with a simple framework that would help the community create and share new playbooks.
+
+If, however, **you are looking for a more feature rich and mature application for Azure Cloud Forensics** I would suggest you check out the excellent work performed by the cyber security experts that created the following applications: 
+
+- CISA's [Sparrow](https://github.com/cisagov/Sparrow)
+- [HAWK](https://github.com/T0pCyber/hawk)
+- CrowdStrike Reporting Tool for Azure [CRT](https://github.com/CrowdStrike/CRT)
+
+*I'm sure there is a more extensive list of tools, but these are the ones I could come up with. Feel free to suggest some more.*
+
+### Why Powershell?
+
+1. I didn't want to re-invent the wheel
+2. Yes the Powershell interface to Azure's UnifiedAuditLog is unstable, but in terms of time-to-production it would have taken me an insane amount of hours to achieve the same thing writing a whole new interface in languages such as .NET, Golang or Python to achieve the same objectives. In the meanwhile, *the world of Cyber Defense and Response does not wait!*
 
 ## TODO
 
