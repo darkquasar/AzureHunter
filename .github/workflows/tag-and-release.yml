@@ -86,12 +86,15 @@ jobs:
       
       # Invoke our wrapper around Invoke-Build
       # We must install GitVersion since it's used by some Build Tasks via Powershell InvokeBuild
-      # To Add: choco install -y GitVersion.Portable --force
       - name: Build Module
         id: build_module
         env:
           GitVersionTag: ${{ needs.retrieve-git-version.outputs.GitVersionSemVer }}
+          TestVar: MyTestVarContent
         run: |
+          Write-Host "GitVersion Environment Variable: $env:GitVersionTag"
+          Write-Host "GitVersion Environment Variable: $env:TestVar"
+          choco install -y GitVersion.Portable --force
           .\BuildModule.ps1 -BuildTask "Default"
 
       - name: Output BuildModuleDir
