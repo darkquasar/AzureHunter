@@ -13,10 +13,14 @@ A Powershell module to run threat hunting playbooks on data from Azure and O365 
 
 ## Getting Started
 
-Install from the PSGallery and Import the module
+**First** please make sure you have **ExchangeOnlineManagement** (*EXOv2*) installed. You can find instructions on the web or go directly to my little KB on how to do it at [the soc analyst scrolls](https://docs.quasarops.com/en/public/the-soc-analyst-scrolls/powershell#useful-powershell-modules)
 
-    Install-Module AzureHunter -Scope CurrentUser
-    Import-Module AzureHunter
+Then you can install AzureHunter from the PSGallery and Import the module
+
+```powershell
+Install-Module AzureHunter -Scope CurrentUser
+Import-Module AzureHunter
+```
 
 ## What is the UnifiedAuditLog?
 
@@ -25,6 +29,11 @@ The unified audit log contains user, group, application, domain, and directory a
 The UnifiedAuditLog is a great source of cloud forensic information since it contains a wealth of data on multiple types of cloud operations like ExchangeItems, SharePoint, Azure AD, OneDrive, Data Governance, Data Loss Prevention, Windows Defender Alerts and Quarantine events, Threat intelligence events in Microsoft Defender for Office 365 and the list goes on and on!
 
 ## Usage
+
+### Ensure you connect to ExchangeOnline
+It's recommended that you run `Connect-ExchangeOnline` before running any `AzureHunter` commands. The program checks for an active remote session and attempts to connect but some versions of Powershell don't allow this and you need to do it yourself regardless.
+
+### Run AzureHunter
 
 **AzureHunter** has two main commands: `Search-AzureCloudUnifiedLog` and `Invoke-HuntAzureAuditLogs`. 
 
