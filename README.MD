@@ -7,15 +7,40 @@ A Powershell module to run threat hunting playbooks on data from Azure and O365 
 [![PS Gallery](https://img.shields.io/badge/install-PS%20Gallery-blue.svg)](https://www.powershellgallery.com/packages/AzureHunter/)
 [![Coverage Status](https://coveralls.io/repos/github/darkquasar/AzureHunter/badge.svg?branch=master)](https://coveralls.io/github/darkquasar/AzureHunter?branch=master)
 [![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat)](http://AzureHunter.readthedocs.io/en/latest/?badge=latest)
-![PowerShell Gallery](https://img.shields.io/powershellgallery/dt/AzureHunter)
-
 ![azurehunter-demo-gif](https://github.com/darkquasar/AzureHunter/blob/5a94c58dbcb83cb2a153e73bebc568f1e3e96c57/media/azurehunter-gif-demo.gif)
+
 
 ## Getting Started
 
-**First** please make sure you have **ExchangeOnlineManagement** (*EXOv2*) installed. You can find instructions on the web or go directly to my little KB on how to do it at [the soc analyst scrolls](https://docs.quasarops.com/en/public/the-soc-analyst-scrolls/powershell#useful-powershell-modules)
+### 1. Check that you have the right O365 Permissions
 
-Then you can install AzureHunter from the PSGallery and Import the module
+The following roles are required in Exchange Online, in order to be able to have *read only* access to the UnifiedAuditLog: `View-Only Audit Logs` or `Audit Logs`.
+
+These roles are assigned by default to the `Compliance Management` role group in Exchange Admin Center.
+
+> **NOTE**: if you are a security analyst, incident responder or threat hunter and your organization is NOT giving you **read-only** access to these audit logs, you need to seriously question what their detection and response strategy is!
+
+More information: 
+- [How to search the Audit Log using the GUI](https://docs.microsoft.com/en-us/microsoft-365/compliance/search-the-audit-log-in-security-and-compliance?view=o365-worldwide#search-the-audit-log)
+- [Manage role groups in Exchange Online](https://docs.microsoft.com/en-us/office365/securitycompliance/search-the-audit-log-in-security-and-compliance)
+- [How to enable the UnifiedAuditLog](https://gcits.com/knowledge-base/enabling-unified-audit-log-delegated-office-365-tenants-via-powershell/)
+
+> **NOTE**: your admin can verify these requirements by running `Get-ManagementRoleEntry "*\Search-UnifiedAuditLog"` in your Azure tenancy cloud shell or local powershell instance connected to Azure.
+
+### 2. Ensure ExchangeOnlineManagement v2 PowerShell Module is installed
+
+Please make sure you have **ExchangeOnlineManagement** (*EXOv2*) installed. You can find instructions on the web or go directly to my little KB on how to do it at [the soc analyst scrolls](https://docs.quasarops.com/en/public/the-soc-analyst-scrolls/powershell#useful-powershell-modules)
+
+### 3. Either Clone the Repo or Install AzureHunter from the PSGallery
+
+#### 3.1 Cloning the Repo
+
+1. Clone this repository
+2. Import the module `Import-Module .\source\AzureHunter.psd1`
+
+#### 3.2 Install AzureHunter from the PSGallery
+
+All you need to do is: 
 
 ```powershell
 Install-Module AzureHunter -Scope CurrentUser
@@ -27,6 +52,15 @@ Import-Module AzureHunter
 The unified audit log contains user, group, application, domain, and directory activities performed in the Microsoft 365 admin center or in the Azure management portal. For a complete list of Azure AD events, see the list of [RecordTypes](https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype).
 
 The UnifiedAuditLog is a great source of cloud forensic information since it contains a wealth of data on multiple types of cloud operations like ExchangeItems, SharePoint, Azure AD, OneDrive, Data Governance, Data Loss Prevention, Windows Defender Alerts and Quarantine events, Threat intelligence events in Microsoft Defender for Office 365 and the list goes on and on!
+
+## AzureHunter Data Consistency Checks
+
+AzureHunter implements some useful logic to ensure that the highest log density is mined and exported from Azure & O365 Audit Logs. In order to do this, we run two different operations for each cycle (batch): 
+
+1. **Automatic Window Time Reduction**: this check ensures that the time interval is reduced to the optimal interval based on the **ResultSizeUpperThreshold** parameter which by default is 20k. This means, if the amounts of logs returned within your designated **TimeInterval** is higher than **ResultSizeUpperThreshold**, then an automatic adjustment will take place. 
+2. **Sequential Data Check**: are returned Record Indexes sequentially valid?
+
+![azurehunter-logical-consistency-checks](media/azhunter-structure.png)
 
 ## Usage
 
@@ -73,6 +107,7 @@ Invoke-HuntAzureAuditLogs -Records $RecordArray -Playbooks 'AzHunter.Playbook.Ex
 ```
 
 ## Why?
+
 Since the aftermath of the *SolarWinds Supply Chain Compromise* many tools have emerged out of deep forges of cyberforensicators, carefully developed by cyber blacksmith ninjas. These tools usually help you perform cloud forensics in Azure. My intention with AzureHunter is not to bring more noise to this crowded space, however, I found myself in the need to address some gaps that I have observed in some of the tools in the space (I might be wrong though, since there is a proliferation of tools out there and I don't know them all...):
 
 a. Azure cloud forensic tools don't usually address the complications of the Powershell API for the `UnifiedAuditLog`. This API is **very unstable and inconsistent** when exporting large quantities of data. I wanted to develop an interface that is fault tolerant (**enough**) to address some of these issues focusing solely on the *UnifiedAuditLog* since this is the Azure artefact that contains the most relevant and detailed activity logs for users, applications and services.

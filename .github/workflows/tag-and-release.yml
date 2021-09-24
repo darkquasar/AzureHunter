@@ -53,16 +53,23 @@ jobs:
     needs: [retrieve-git-version]
     if: "contains(github.event.head_commit.message, '+tag')"
     outputs:
-      LatestTag: ${{ needs.retrieve-git-version.outputs.GitVersionSemVer }}
+      LatestTag: ${{ steps.FetchLatestTagToVariable.outputs.LatestTag }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
+
       - uses: tvdias/github-tagger@v0.0.1
         with:
           repo-token: ${{ secrets.GHTOKEN }}
           tag: "${{ needs.retrieve-git-version.outputs.GitVersionSemVer }}"
+      
+      - name: Get Latest Tag into Output Variable
+        id: FetchLatestTagToVariable
+        env:
+          LatestTagEnv: ${{ needs.retrieve-git-version.outputs.GitVersionSemVer }}
+        run: echo "::set-output name=LatestTag::$LatestTagEnv"
 
   # Second, create a release and publish to PowershellGallery if so indicated in commit message
   # Note: I should cache the build directory and restore in a posterior job to decouple this step
@@ -89,12 +96,10 @@ jobs:
       - name: Build Module
         id: build_module
         env:
-          GitVersionTag: ${{ needs.retrieve-git-version.outputs.GitVersionSemVer }}
-          TestVar: MyTestVarContent
+          GitVersionTag: ${{ needs.tag-latest-commit.outputs.LatestTag }}
         run: |
           Write-Host "GitVersion Environment Variable: $env:GitVersionTag"
-          Write-Host "GitVersion Environment Variable: $env:TestVar"
-          choco install -y GitVersion.Portable --force
+          choco install -y GitVersion.Portable --force --no-progress
           .\BuildModule.ps1 -BuildTask "Default"
 
       - name: Output BuildModuleDir
