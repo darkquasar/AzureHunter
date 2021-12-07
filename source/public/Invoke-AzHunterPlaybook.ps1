@@ -2,11 +2,11 @@
     CYBERNETHUNTER SECURITY OPERATIONS :)
     Author: Diego Perez (@darkquassar)
     Version: 1.1.0
-    Module: Hunt-AzureAuditLogs.ps1
-    Description: This module contains some utilities to search through Azure and O365 unified audit log.
+    Module: Hunt-AzHunterPlaybook.ps1
+    Description: This module contains some utilities to run playbooks through Azure, eDiscovery and O365 logs.
 #>
 
-Function Invoke-HuntAzureAuditLogs {
+Function Invoke-AzHunterPlaybook {
     <#
     .SYNOPSIS
         A PowerShell function to search the Azure Audit Log
@@ -29,11 +29,11 @@ Function Invoke-HuntAzureAuditLogs {
     )]
     Param (
         [Parameter( 
-            Mandatory=$True,
+            Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
             Position=0,
-            HelpMessage='The records to process'
+            HelpMessage='The records to process from a powershell object'
         )]
         [ValidateNotNullOrEmpty()]
         [Object]$Records,
@@ -43,6 +43,27 @@ Function Invoke-HuntAzureAuditLogs {
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
             Position=1,
+            HelpMessage='A CSV or JSON file to process instead of providing records'
+        )]
+        [ValidateNotNullOrEmpty()]
+        [String]$FileName,
+
+        [Parameter( 
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=2,
+            HelpMessage='The type of Azure Log to process. It helps orient the selection of Playbooks'
+        )]
+        [ValidateNotNullOrEmpty()]
+        [ValidateSet('UnifiedAuditLog','eDiscoverySummaryReport','AzureAD')]
+        [String]$AzureLogType,
+
+        [Parameter( 
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=3,
             HelpMessage='The playbook you would like to run for the current batch of logs'
         )]
         [ValidateNotNullOrEmpty()]
@@ -52,7 +73,17 @@ Function Invoke-HuntAzureAuditLogs {
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
-            Position=2,
+            Position=3,
+            HelpMessage='The playbook parameters, if required, that will be passed onto the playbook'
+        )]
+        [ValidateNotNullOrEmpty()]
+        [array]$PlayBookParameters=@(),
+
+        [Parameter( 
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=4,
             HelpMessage='Whether we want records returned back to the console'
         )]
         [ValidateNotNullOrEmpty()]
@@ -103,38 +134,66 @@ Function Invoke-HuntAzureAuditLogs {
         # Initialize Logger
         # $LoggerExists = Get-Variable -Name $Logger -Scope Global -ErrorAction SilentlyContinue
         if(!$Global:Logger){ $Logger = [Logger]::New() }
-        $Logger.LogMessage("Initializing HuntAzureAuditLogs", "INFO", $null, $null)
+        $Logger.LogMessage("Initializing AzHunterPlaybook Module", "INFO", $null, $null)
     }
 
     PROCESS {
-        
-        # Let's cast records to a [AuditLogSchemaGeneric] Type dropping unnecessary properties
-        $Logger.LogMessage("Pre-Processing Records", "INFO", $null, $null)
-        [System.Collections.ArrayList]$AzHunterRecords = @()
-        $Records | ForEach-Object { 
-            $SingleRecord = $_ | Select-Object -Property RecordType, CreationDate, UserIds, Operations, AuditData, ResultIndex, ResultCount, Identity
-            $AzHunterRecords.Add($SingleRecord -as [AuditLogSchemaGeneric]) | Out-Null }
+
+        # Define whether we've got Records or a FileName
+        if($Records -and $FileName) {
+            $Logger.LogMessage("Please specify either Records or a FileName but not both", "ERROR", $null, $_)
+            throw
+        }
+        elseif($Records) {
+            if($AzureLogType -eq "UnifiedAuditLog") {
+                # Let's cast UAL records to a [AuditLogSchemaGeneric] Type dropping unnecessary properties
+                $Logger.LogMessage("Pre-Processing Records", "INFO", $null, $null)
+                [System.Collections.ArrayList]$AzHunterRecords = @()
+                $Records | ForEach-Object { 
+                    $SingleRecord = $_ | Select-Object -Property RecordType, CreationDate, UserIds, Operations, AuditData, ResultIndex, ResultCount, Identity
+                    $AzHunterRecords.Add($SingleRecord -as [AuditLogSchemaGeneric]) | Out-Null }
+            }
+        }
+        elseif($FileName) {
+            $InputFilePath = [System.IO.DirectoryInfo]::new($FileName)
+        }
         
         # (1) Applying Base Playbook
-        $BasePlaybookRecords = [AzHunterBase]::new($AzHunterRecords).DedupRecords("Identity").SortRecords("CreationDate")
+        # Don't apply sorting first since it can be very slow for big datasets
+        # $BasePlaybookRecords = [AzHunterBase]::new($AzHunterRecords).DedupRecords("Identity").SortRecords("CreationDate")
 
         # (2) Applying Remaining Playbooks
         # Let's load playbook files first via dot sourcing scripts
         
         ForEach($Playbook in $PlayBooks) {
             $Logger.LogMessage("Checking Playbooks to be applied to the data...", "INFO", $null, $null)
+
             # Let's run the Playbooks passing in the records
             $PlaybookFileList | ForEach-Object {
                 $PlaybookBaseName = $_.BaseName
                 $Logger.LogMessage("Evaluating Playbook $PlaybookBaseName", "INFO", $null, $null)
                 if($PlaybookBaseName -eq $Playbook) {
                     try {
-                        . $_.FullName
+                        . $_.FullName # Load Playbook file in the current session
+
+
                         if($PassThru) {
-                            $ReturnRecords = Start-AzHunterPlaybook -Records $BasePlaybookRecords.AzureHuntersRecordsArray -PassThru
+                            if($Records) {
+                                $ProcessedRecords = Start-AzHunterPlaybook -Records $AzHunterRecords.AzureHuntersRecordsArray -PassThru
+                            }
+                            elseif($FileName) {
+                                $ProcessedRecords = Start-AzHunterPlaybook -Records $InputFilePath -PassThru
+                            }
+
+                            return $ProcessedRecords
                         }
                         else {
-                            Start-AzHunterPlaybook -Records $BasePlaybookRecords.AzureHuntersRecordsArray
+                            if($Records) {
+                                Start-AzHunterPlaybook -Records $AzHunterRecords.AzureHuntersRecordsArray
+                            }
+                            elseif($FileName) {
+                                Start-AzHunterPlaybook -Records $InputFilePath
+                            }
                         }
                     }
                     catch {
@@ -154,4 +213,4 @@ Function Invoke-HuntAzureAuditLogs {
 
 }
 
-Export-ModuleMember -Function 'Invoke-HuntAzureAuditLogs'
+Export-ModuleMember -Function 'Invoke-AzHunterPlaybook'

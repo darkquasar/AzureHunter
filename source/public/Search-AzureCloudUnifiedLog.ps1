@@ -12,13 +12,11 @@ using namespace AzureHunter.TimeStamp
 using namespace AzureHunter.AzCloudInit
 
 try {
-    Get-Command Invoke-HuntAzureAuditLogs
+    Get-Command Invoke-AzHunterPlaybook
 }
 catch {
-    # Need to Import Module Invoke-HuntAzureAuditLogs
-    . .\Invoke-HuntAzureAuditLogs.ps1
-    # Need to load base playbook
-    . ".\AzHunter.Playbook.Base.ps1"
+    # Need to Import Module Invoke-AzHunterPlaybook
+    . .\Invoke-AzHunterPlaybook.ps1
 }
 
 $AzureHunterLogo = @'
