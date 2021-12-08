@@ -12,7 +12,7 @@
 RootModule = 'AzureHunter.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.3.8'
+ModuleVersion = '1.6.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
