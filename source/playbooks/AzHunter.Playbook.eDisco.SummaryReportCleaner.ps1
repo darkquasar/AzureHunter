@@ -11,12 +11,19 @@ Function Start-AzHunterPlaybook {
  
     .DESCRIPTION
         This playbook expects to be provided an Advanced eDiscovery Summary Report containing a list of emails and attachments from a Review Set. It will create three different files as output: 
+
 			1. A BasicFilteredSet which only keeps a subset of columns, applies DateTime transformations to match your local time and fills down "Date" values for attachments associated with an email belonging to the same FamilyID.
 			2. A TransposedSet which grabs the BasicFilteredSet and removes the "Email_subject" and "Native_file_name" columns and, instead, consolidates both of them into a single columns called "Mail_Subject_or_File_Name"
 			3. A SODSet, which grabs the results from the TransposedSet and converts it to SpreadSheet of Doom format capturing the following attributes: TimeStamp, System, Artifact, Event, User, Comments
  
     .PARAMETER Records
         An array of records or a file path to apply different data transformations to. The file is expected to be in CSV format.
+
+    .PARAMETER SylvanCsvBufer
+        The size of the CSV buffer. The bigger the buffer, the more bytes it can process but the slower it is. Default: 25000.
+
+    .PARAMETER CsvRecordsBatchSize
+        The CSV export batch size. This is the amount of records that will be accumulated in memory before dumping them to Disk or passing them to the next pipeline. Default: 2000.
 
     .NOTES
         Please use this with care and for legitimate purposes. The author does not take responsibility on any damage performed as a result of employing this script.
@@ -61,13 +68,24 @@ Function Start-AzHunterPlaybook {
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
             Position=3,
-            HelpMessage='The CSV export batch size. This is the amount of records that will be accumulated in memory before dumping them to Disk or passing them to the next pipeline. Default: 2000.'
+            HelpMessage='The CSV export batch size. This is the amount of records that will be accumulated in memory before dumping them to Disk or passing them to the next pipeline. Default: 500.'
         )]
         [ValidateNotNullOrEmpty()]
-        [int]$CsvRecordsBatchSize = 5000
+        [int]$CsvRecordsBatchSize = 500,
+
+        [Parameter( 
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=0,
+            HelpMessage='eDiscovery Item Class. The default setting will only export emails and attachments by selecting "IPM.Note" as the item class. Multiple item classes can be passed as strings separated by coma like this: "IPM.Note", "IPM.Schedule.Meeting.Request", etc. You can also pass in a value of "All" so that all items are exported in the summary. For more information see: https://docs.microsoft.com/en-us/microsoft-365/compliance/keyword-queries-and-search-conditions?view=o365-worldwide'
+        )]
+        [ValidateNotNullOrEmpty()]
+        [String[]]$eDiscoItemClass = "IPM.Note"
     )
 
     BEGIN {
+
 		# *** BEGIN: GENERAL *** #
         $PlaybookName = 'AzHunter.Playbook.eDisco.SummaryReportCleaner'
         
@@ -99,7 +117,6 @@ Function Start-AzHunterPlaybook {
         $CsvReaderOptions = [Sylvan.Data.Csv.CsvDataReaderOptions]::new()
         $CsvReaderOptions.BufferSize = $SylvanCsvBufer # Increasing Buffer so long strings of CSV data can be parsed without issues
 
-        
         # *** END: GENERAL *** #
 
         $Logger.LogMessage("[$PlaybookName] Export Folder Name set to: $($PlaybookOutputFolder.FullName)", "INFO", $null, $null)
@@ -128,16 +145,10 @@ Function Start-AzHunterPlaybook {
         [System.Collections.ArrayList]$AzHuntereDiscoveryCollection = @()
         [System.Collections.ArrayList]$AzHuntereDiscoveryCollectionLinkedListTracker = @()
 
-        $FamilyIDAndDateRecord = [Ordered]@{
-                    "FamilyID"          = ""
-                    "TimeStamp"         = ""
-        }
-        [System.Collections.ArrayList]$AzHunterFamilyIDRecords = @()
-
-
-        $LinkedListTrackerCounter = 1
         $CurrentFamilyID = ""
         $PreviousFamilyID = ""
+        $SkippedRecordFamilyID = "" # To keep track of the FamilyID items to skip as part of ItemClass check
+        $SkippedRecordsCount = 0 # To keep track of how many have been skipped
 
         while($csv.Read()){
 
@@ -263,6 +274,36 @@ Function Start-AzHunterPlaybook {
             }
 
             # *** POST-PROCESS RECORD ***
+            # Drop record if it does not match our Item Class Selector
+            $SkipRecord = $False
+            
+            if($eDiscoItemClass -ine "All") {
+
+                # Check first whether we should ignore the record because it belongs to the same FamilyID as the one we wanted to skip. This will for example skip Attachments that belonged to a Item Classes such as "IPM.Schedule.Meeting.Request" which are meeting invites with attached documents.
+
+                if($eDiscoverySchema.Family_ID -eq $SkippedRecordFamilyID) {
+                    continue
+                }
+
+                ForEach($ItemClass in $eDiscoItemClass) { 
+
+                    if(($eDiscoverySchema.Item_Class -eq "") -xor ($eDiscoverySchema.Item_Class -ieq $ItemClass)) {
+                        $SkipRecord = $False
+
+                    }
+                    else {
+                        $SkipRecord = $True
+                        $SkippedRecordFamilyID = $eDiscoverySchema.Family_ID
+                        $SkippedRecordsCount++
+                        break
+                    }
+                }
+
+                if($SkipRecord -eq $True) {
+                   continue
+                }
+
+            }
 
             # 01. Convert Date to current timezone time format
             if($eDiscoverySchema.Date -ne ""){$eDiscoverySchema.Date = $eDiscoverySchema.Date.ToLocalTime().AddHours(-1).ToString('dd-MM-yyy hh:mm:ss tt')}
@@ -271,14 +312,13 @@ Function Start-AzHunterPlaybook {
             $TempRecordObj = New-Object -TypeName PSObject -Property $eDiscoverySchema
 
             if($AzHuntereDiscoveryCollectionLinkedListTracker.Count -eq 2){
-                #$LinkedListTrackerCounter = 0
-                #[System.Collections.ArrayList]$AzHuntereDiscoveryCollectionLinkedListTracker = @()
+
                 $AzHuntereDiscoveryCollectionLinkedListTracker[0] = $AzHuntereDiscoveryCollectionLinkedListTracker[1]
                 $AzHuntereDiscoveryCollectionLinkedListTracker[1] = $TempRecordObj
             }
             else {
                 $AzHuntereDiscoveryCollectionLinkedListTracker.Add($TempRecordObj) | Out-Null
-                #$LinkedListTrackerCounter++
+
             }
 
             if($AzHuntereDiscoveryCollectionLinkedListTracker.Count -eq 1){
@@ -292,7 +332,6 @@ Function Start-AzHunterPlaybook {
             # 03. Fill Down Date Values for Attachments
             # 03.01 First let's make sure that both Previous and Current FamilyIDs have the same Date
             if($PreviousFamilyID -eq $CurrentFamilyID){
-                #Write-Host "about to: $($AzHuntereDiscoveryCollectionLinkedListTracker[1].Date)"
 
                 $AzHuntereDiscoveryCollectionLinkedListTracker[1].Date = $AzHuntereDiscoveryCollectionLinkedListTracker[0].Date
 
@@ -339,7 +378,7 @@ Function Start-AzHunterPlaybook {
 
             # Add in Batches of 2000 Records
             if($AzHuntereDiscoveryCollection.Count -eq $CsvRecordsBatchSize){
-
+                $Logger.LogMessage("Skipped $SkippedRecordsCount total records so far...", "INFO", $null, $null) 
                 $Logger.LogMessage("Exporting $($AzHuntereDiscoveryCollection.Count) records to output file", "INFO", $null, $null)
 
                 if(-not $PassThru) {

@@ -57,6 +57,9 @@ Function New-OutputFolder {
         [ValidateNotNullOrEmpty()]
         [switch]$NewParentOutputFolder
     )
+
+    # Initialize Logger
+    if(!$Global:Logger){ $Logger = [Logger]::New() }
         
     if($NewParentOutputFolder) {
         try {
@@ -65,14 +68,25 @@ Function New-OutputFolder {
             $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
             $ParentFolderName = "AzHunter-$strTimeNow-output"
             $Global:AzHunterParentOutputFolder = New-Item -Path $CurrentFolder.FullName -Name $ParentFolderName -ItemType Directory
+            $Logger.LogMessage("Created Parent Output Folder: $Global:AzHunterParentOutputFolder", "INFO", $null, $null)
         }
         catch {
             Write-Host "Parent Output Folder Could not be Created"
         }
     }
     else {
-
-        $AzHunterPlaybookOutputFolder = New-Item -Path $Global:AzHunterParentOutputFolder -Name $FolderName -ItemType Directory
+        
+        $ProposedFolder = "$Global:AzHunterParentOutputFolder\$FolderName"
+        $FolderAlreadyExists = Test-Path $ProposedFolder
+        if($FolderAlreadyExists) {
+            $Logger.LogMessage("Folder $ProposedFolder already exists. No need to create a new one.", "INFO", $null, $null)
+            $ExistingPath = Join-Path $Global:AzHunterParentOutputFolder $FolderName
+            $AzHunterPlaybookOutputFolder = [System.IO.DirectoryInfo]::new($ExistingPath)
+        }
+        else {
+            $AzHunterPlaybookOutputFolder = New-Item -Path $Global:AzHunterParentOutputFolder -Name $FolderName -ItemType Directory
+        }
+        
         return $AzHunterPlaybookOutputFolder
     }
 

@@ -9,7 +9,7 @@
 Function Invoke-AzHunterPlaybook {
     <#
     .SYNOPSIS
-        A PowerShell function to search the Azure Audit Log
+        A PowerShell function to run playbooks over data obtained via AzureHunter
  
     .DESCRIPTION
         This function will perform....
@@ -53,7 +53,7 @@ Function Invoke-AzHunterPlaybook {
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
             Position=2,
-            HelpMessage='The type of Azure Log to process. It helps orient the selection of Playbooks'
+            HelpMessage='The type of Azure Log to process. It helps orient the selection of Playbooks. Not a required parameter.'
         )]
         [ValidateNotNullOrEmpty()]
         [ValidateSet('UnifiedAuditLog','eDiscoverySummaryReport','AzureAD')]
@@ -67,17 +67,18 @@ Function Invoke-AzHunterPlaybook {
             HelpMessage='The playbook you would like to run for the current batch of logs'
         )]
         [ValidateNotNullOrEmpty()]
-        [String[]]$PlayBooks='AzHunter.Playbook.Exporter',
+        [String[]]$PlayBooks='AzHunter.Playbook.UAL.Exporter',
 
         [Parameter( 
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
             Position=3,
-            HelpMessage='The playbook parameters, if required, that will be passed onto the playbook'
+            HelpMessage='The playbook parameters, if required, that will be passed onto the playbook via Splatting. It needs to be a HashTable like: $Params = @{ "Path" = "TestFile.txt", "ExtractDetails" = $True }'
+
         )]
         [ValidateNotNullOrEmpty()]
-        [array]$PlayBookParameters=@(),
+        [hashtable]$PlayBookParameters,
 
         [Parameter( 
             Mandatory=$False,
@@ -92,6 +93,10 @@ Function Invoke-AzHunterPlaybook {
     )
 
     BEGIN {
+
+        # Initialize Logger
+        if(!$Global:Logger){ $Logger = [Logger]::New() }
+        $Logger.LogMessage("Initializing AzHunterPlaybook Module", "INFO", $null, $null)
 
         # Determine path to Playbooks folder
         # This is required to pre-load the Base Playbook "AzHunterBase" to do initial sanitization of logs
@@ -112,6 +117,7 @@ Function Invoke-AzHunterPlaybook {
                 $Script:PlaybooksPath = Join-Path $ScriptPath "playbooks"
             }
             else {
+                $Logger.LogMessage("Could not find Playbooks folder", "ERROR", $null, $_)
                 throw "Could not find Playbooks folder"
             }
         }
@@ -131,39 +137,36 @@ Function Invoke-AzHunterPlaybook {
             $PlaybookFileList.Add([System.IO.FileInfo]::new($_)) | Out-Null
         }
 
-        # Initialize Logger
-        # $LoggerExists = Get-Variable -Name $Logger -Scope Global -ErrorAction SilentlyContinue
-        if(!$Global:Logger){ $Logger = [Logger]::New() }
-        $Logger.LogMessage("Initializing AzHunterPlaybook Module", "INFO", $null, $null)
+        # Determine whether we have an object with records or a pointer to a file for the Records parameter
+        if($Records.GetType() -eq [System.String]) {
+            $Logger.LogMessage("Records parameter points to a file, creating file object.", "INFO", $null, $null)
+            $Records = [System.IO.FileInfo]::new($Records)
+        }
+
     }
 
     PROCESS {
 
-        # Define whether we've got Records or a FileName
-        if($Records -and $FileName) {
-            $Logger.LogMessage("Please specify either Records or a FileName but not both", "ERROR", $null, $_)
-            throw
-        }
-        elseif($Records) {
-            if($AzureLogType -eq "UnifiedAuditLog") {
-                # Let's cast UAL records to a [AuditLogSchemaGeneric] Type dropping unnecessary properties
-                $Logger.LogMessage("Pre-Processing Records", "INFO", $null, $null)
-                [System.Collections.ArrayList]$AzHunterRecords = @()
-                $Records | ForEach-Object { 
-                    $SingleRecord = $_ | Select-Object -Property RecordType, CreationDate, UserIds, Operations, AuditData, ResultIndex, ResultCount, Identity
-                    $AzHunterRecords.Add($SingleRecord -as [AuditLogSchemaGeneric]) | Out-Null }
+        if(($AzureLogType -eq "UnifiedAuditLog") -or ($Playbook -contains "UAL")) {
+            if($Records.GetType() -ne [System.Object[]]) {
+                $Logger.LogMessage("Sorry we have not yet implemented the processing of UAL records from files. You need to load the UAL CSV file into an array first using Import-Csv", "ERROR", $null, $_)
+                break
             }
+            # Let's cast UAL records to a [AuditLogSchemaGeneric] Type dropping unnecessary properties
+            $Logger.LogMessage("Pre-Processing Records", "INFO", $null, $null)
+            [System.Collections.ArrayList]$AzHunterRecords = @()
+            $Records | ForEach-Object { 
+                $SingleRecord = $_ | Select-Object -Property RecordType, CreationDate, UserIds, Operations, AuditData, ResultIndex, ResultCount, Identity
+                $AzHunterRecords.Add($SingleRecord -as [AuditLogSchemaGeneric]) | Out-Null }
+
+            $Records = $AzHunterRecords.AzureHuntersRecordsArray
         }
-        elseif($FileName) {
-            $InputFilePath = [System.IO.DirectoryInfo]::new($FileName)
-        }
-        
+
         # (1) Applying Base Playbook
         # Don't apply sorting first since it can be very slow for big datasets
         # $BasePlaybookRecords = [AzHunterBase]::new($AzHunterRecords).DedupRecords("Identity").SortRecords("CreationDate")
 
         # (2) Applying Remaining Playbooks
-        # Let's load playbook files first via dot sourcing scripts
         
         ForEach($Playbook in $PlayBooks) {
             $Logger.LogMessage("Checking Playbooks to be applied to the data...", "INFO", $null, $null)
@@ -171,28 +174,29 @@ Function Invoke-AzHunterPlaybook {
             # Let's run the Playbooks passing in the records
             $PlaybookFileList | ForEach-Object {
                 $PlaybookBaseName = $_.BaseName
-                $Logger.LogMessage("Evaluating Playbook $PlaybookBaseName", "INFO", $null, $null)
+                
                 if($PlaybookBaseName -eq $Playbook) {
                     try {
+
+                        $Logger.LogMessage("Loading Playbook $PlaybookBaseName", "INFO", $null, $null)
+
                         . $_.FullName # Load Playbook file in the current session
 
-
                         if($PassThru) {
-                            if($Records) {
-                                $ProcessedRecords = Start-AzHunterPlaybook -Records $AzHunterRecords.AzureHuntersRecordsArray -PassThru
+                            if($PlayBookParameters) {
+                                $ProcessedRecords = Start-AzHunterPlaybook @PlayBookParameters -Records $Records -PassThru
                             }
-                            elseif($FileName) {
-                                $ProcessedRecords = Start-AzHunterPlaybook -Records $InputFilePath -PassThru
+                            else {
+                                $ProcessedRecords = Start-AzHunterPlaybook -Records $Records -PassThru
                             }
-
                             return $ProcessedRecords
                         }
                         else {
-                            if($Records) {
-                                Start-AzHunterPlaybook -Records $AzHunterRecords.AzureHuntersRecordsArray
+                            if($PlayBookParameters) {
+                                Start-AzHunterPlaybook @PlayBookParameters -Records $Records 
                             }
-                            elseif($FileName) {
-                                Start-AzHunterPlaybook -Records $InputFilePath
+                            else {
+                                Start-AzHunterPlaybook -Records $Records
                             }
                         }
                     }
@@ -206,9 +210,6 @@ Function Invoke-AzHunterPlaybook {
 
     END {
         $Logger.LogMessage("Finished running Playbooks", "SPECIAL", $null, $null)
-        if($PassThru){
-            return $ReturnRecords
-        }
     }
 
 }

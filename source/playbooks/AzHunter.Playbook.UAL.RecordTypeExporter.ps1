@@ -59,10 +59,9 @@ Function Start-AzHunterPlaybook {
         # *** END: GENERAL *** #
 
         # Configure Output Folder
-		$CurrentFolder = [System.IO.DirectoryInfo]::new($pwd)
-        $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
-		$PluginOutputFolder = New-Item -Path $CurrentFolder.FullName -Name $PlaybookName -ItemType Directory
-        $Logger.LogMessage("[$PlaybookName] Export Folder Name set to: $($PluginOutputFolder.FullName)", "INFO", $null, $null)
+        # Create output folder for Playbook inside default parent output folder for this session
+        $PlaybookOutputFolder = New-OutputFolder -FolderName $PlaybookName
+        $Logger.LogMessage("[$PlaybookName] Export Folder Name set to: $($PlaybookOutputFolder.FullName)", "INFO", $null, $null)
     }
 
     PROCESS {
@@ -77,7 +76,7 @@ Function Start-AzHunterPlaybook {
 				ConvertFrom-Json | 
 				ForEach-Object { $_.CreationTime = $_.CreationTime.ToDateTime([cultureinfo]::CurrentCulture).ToLocalTime().ToString('dd-MM-yyy hh:mm:ss tt')
 				$_ } |
-				Export-Csv -NoClobber -NoTypeInformation "$PluginOutputFolder\azhunter-exporter-$OperationType.csv" -Append
+				Export-Csv -NoClobber -NoTypeInformation "$PlaybookOutputFolder\AzHunter.Playbook.UAL.Record.$OperationType.csv" -Append
 		}
 
     }

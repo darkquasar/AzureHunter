@@ -9,7 +9,7 @@ $script:SourcePath = Join-Path $BuildRoot $RelativeSourcePathName # Where to sou
 $script:BuildOutputFolder = Join-Path $BuildRoot Output # Folder where the output of all build & release tasks will be placed
 $script:ReleaseDir = Join-Path $script:BuildOutputFolder Release # Folder where the release package or zip will be placed
 $script:BuildDestinationFolder = Join-Path $BuildOutputFolder $ModuleName # Folder inside $BuildOutputFolder where we will place our built artefacts or final Module
-$script:ExcludedDirs = ( 'public', 'classes', 'enums' )
+$script:ExcludedDirs = ( 'private', 'public', 'classes', 'enums' )
 
 # Let's provide stdout output with information on relevant environment context
 Task ContextAwareness {

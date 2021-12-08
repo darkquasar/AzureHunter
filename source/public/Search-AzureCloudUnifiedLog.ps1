@@ -36,25 +36,43 @@ $AzureHunterLogo = @'
 Function Search-AzureCloudUnifiedLog {
     <#
     .SYNOPSIS
-        A PowerShell function to search the Azure Audit Log
+        A PowerShell function to search the Azure Unified Audit Log (UAL)
  
     .DESCRIPTION
-        This function will perform....
+        This function will allow you to retrieve UAL logs iteratively implementing some safeguards to ensure the maximum log density is exported, avoiding flaky mistakes produced by the powershell ExchangeOnline API.
  
-    .PARAMETER InputFile
-        XXXXXX
+    .PARAMETER StartDate
+        Start Date in the form: year-month-dayThour:minute:seconds
 
-    .PARAMETER InputString
-        XXXXX
+    .PARAMETER EndDate
+        End Date in the form: year-month-dayThour:minute:seconds
 
-    .PARAMETER InputByteArray
-        XXXXX
+    .PARAMETER TimeInterval
+        Time Interval in hours. This represents the interval windows that will be queried between StartDate and EndDate. This is a sliding window.
+
+    .PARAMETER AggregatedResultsFlushSize
+        The ammount of logs that need to be accumulated before deduping and exporting. Logs are accumulated in batches, setting it to 0 (zero) gets rid of this requirement and exports all batches individually. It is recommended to set this value to 50000 for long searches (i.e. extended in time). The higher the value, the more RAM it will consume but the fewer duplicates you will find in your final results.
+
+    .PARAMETER ResultSizeUpperThreshold
+        Maximum amount of records we want returned within our current time slice and Azure session. It is recommended this is left with the default 20k.
+
+    .PARAMETER AuditLogRecordType
+        The record type that you would like to return. For a list of available ones, check API documentation: https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype. The default value is "All"
+
+    .PARAMETER AuditLogOperations
+        Based on the record type, there are different kinds of operations associated with them. Specify them here separated by commas, each value enclosed within quotation marks.
+
+    .PARAMETER UserIDs
+        The users you would like to investigate. If this parameter is not provided it will default to all users. Specify them here separated by commas, each value enclosed within quotation marks.
+
+    .PARAMETER FreeText
+        You can search the log using FreeText strings, matches are performed based on a "contains" method (i.e. no RegEx)
+
+    .PARAMETER SkipAutomaticTimeWindowReduction
+        This parameter will skip automatic adjustment of the TimeInterval windows between your Start and End Dates.
  
     .EXAMPLE
-        XXXX
- 
-    .EXAMPLE
-        XXX
+        Search-AzureCloudUnifiedLog -StartDate "2021-03-06T10:00:00" -EndDate "2021-06-09T12:40:00" -TimeInterval 12 -AggregatedResultsFlushSize 5000 -Verbose
 
     .EXAMPLE
         XXXX
@@ -178,7 +196,7 @@ Function Search-AzureCloudUnifiedLog {
 
     BEGIN {
 
-        # Show Logo
+        # Show Logo mofo
         Write-Host -ForegroundColor Green $AzureHunterLogo
 
         # *** Getting a handle to the running script path so that we can refer to it *** #
@@ -241,7 +259,7 @@ Function Search-AzureCloudUnifiedLog {
         # **** CHECK IF RUNNING TEST ONLY ****
         if($RunTestOnly) {
             $TestRecords = Get-Content ".\tests\test-data\test-auditlogs.json" | ConvertFrom-Json
-            Invoke-HuntAzureAuditLogs -Records $TestRecords
+            Invoke-AzHunterPlaybook -Records $TestRecords -Playbooks "AzHunter.Playbook.UAL.Exporter"
             break
         }
 
@@ -415,7 +433,7 @@ Function Search-AzureCloudUnifiedLog {
                         if($AggregatedResultsFlushSize -eq 0){
                             $Logger.LogMessage("No Aggregated Results parameter configured. Exporting current batch of records to $ExportFileName", "DEBUG", $null, $null)
                             #$SortedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
-                            Invoke-HuntAzureAuditLogs -Records $SortedResults
+                            Invoke-AzHunterPlaybook -Records $SortedResults -Playbooks "AzHunter.Playbook.UAL.Exporter"
 
                             # Count total records so far
                             $TotalRecords = $TotalRecords + $SortedResults.Count
@@ -436,7 +454,7 @@ Function Search-AzureCloudUnifiedLog {
                             $AggResultCountAfterDedup = $Script:AggregatedResults.Count
                             $AggResultCountDuplicates = $AggResultCountBeforeDedup - $AggResultCountAfterDedup
                             $Logger.LogMessage("AGGREGATED RESULTS | Removed $AggResultCountDuplicates Duplicate Records from Aggregated Results", "SPECIAL", $null, $null)
-                            Invoke-HuntAzureAuditLogs -Records $Script:AggregatedResults
+                            Invoke-AzHunterPlaybook -Records $Script:AggregatedResults -Playbooks "AzHunter.Playbook.UAL.Exporter"
 
                             # Count records so far
                             $TotalRecords = $TotalRecords + $Script:AggregatedResults.Count

@@ -22,7 +22,7 @@ Function Start-AzHunterPlaybook {
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
             Position=0,
-            HelpMessage='AzureHunter Records'
+            HelpMessage='Azure UAL Records'
         )]
         [ValidateNotNullOrEmpty()]
         $Records,
@@ -59,8 +59,12 @@ Function Start-AzHunterPlaybook {
         # *** END: GENERAL *** #
 
         # Configure Output File
+        # Create output folder for Playbook inside default parent output folder for this session
+        $PlaybookOutputFolder = New-OutputFolder -FolderName $PlaybookName
+
         $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
         if(!$Global:AzExporterExportFileName) {
+            <#
             if($Global:Logger) {
                 $ExportFileNameBaseDir = ([System.IO.FileInfo]::new($Global:Logger.LogFileJSON)).Directory.FullName
                 $Global:AzExporterExportFileName = "$ExportFileNameBaseDir\$($env:COMPUTERNAME)-azhunter-exporter-$strTimeNow.csv"
@@ -69,6 +73,8 @@ Function Start-AzHunterPlaybook {
                 $Global:AzExporterExportFileName = "$($ScriptPath.Parent.FullName)\$($env:COMPUTERNAME)-azhunter-exporter-$strTimeNow.csv"
             }
             $Logger.LogMessage("[$PlaybookName] Export File Name set to: $Global:AzExporterExportFileName", "INFO", $null, $null)
+            #>
+            $Global:AzExporterExportFileName = "$PlaybookOutputFolder\AzHunter.UAL.Exporter.$($env:COMPUTERNAME)-$strTimeNow.csv"
         }
         else {
             $Logger.LogMessage("[$PlaybookName] Found Handle to open Export File: $Global:AzExporterExportFileName", "INFO", $null, $null)
