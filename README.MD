@@ -69,15 +69,15 @@ It's recommended that you run `Connect-ExchangeOnline` before running any `Azure
 
 ### Run AzureHunter
 
-**AzureHunter** has two main commands: `Search-AzureCloudUnifiedLog` and `Invoke-HuntAzureAuditLogs`. 
+**AzureHunter** has two main commands: `Search-AzureCloudUnifiedLog` and `Invoke-AzHunterPlaybook`. 
 
 The purpose of `Search-AzureCloudUnifiedLog` is to implement a complex logic to ensure that the highest percentage of *UnifiedAuditLog records* are mined from Azure. By default, it will export extracted and deduplicated records to a CSV file.
 
-The purpose of `Invoke-HuntAzureAuditLogs` is to provide a flexible interface into hunting playbooks stored in the `playbooks` folder. These playbooks are designed so that anyone can contribute with their own analytics and ideas. So far, only two very simple playbooks have been developed: `AzHunter.Playbook.Exporter` and `AzHunter.Playbook.LogonAnalyser`. The `Exporter` takes care of exporting records after applying de-duplication and sorting operations to the data. The `LogonAnalyser` is in beta mode and extracts events where the `Operations` property is `UserLoggedIn`. It is an example of what can be done with the playbooks and how easy it is to construct one. 
+The purpose of `Invoke-AzHunterPlaybook` is to provide a flexible interface into hunting playbooks stored in the `playbooks` folder. These playbooks are designed so that anyone can contribute with their own analytics and ideas. So far, only two very simple playbooks have been developed: `AzHunter.Playbook.Exporter` and `AzHunter.Playbook.LogonAnalyser`. The `Exporter` takes care of exporting records after applying de-duplication and sorting operations to the data. The `LogonAnalyser` is in beta mode and extracts events where the `Operations` property is `UserLoggedIn`. It is an example of what can be done with the playbooks and how easy it is to construct one. 
 
-When running `Search-AzureCloudUnifiedLog`, you can pass in a list of playbooks to run per log batch. `Search-AzureCloudUnifiedLog` will pass on the batch to the playbooks via `Invoke-HuntAzureAuditLogs`.
+When running `Search-AzureCloudUnifiedLog`, you can pass in a list of playbooks to run per log batch. `Search-AzureCloudUnifiedLog` will pass on the batch to the playbooks via `Invoke-AzHunterPlaybook`.
 
-Finally `Invoke-HuntAzureAuditLogs` can, be used standalone. If you have an export of UnifiedAuditLog records, you can load them into a Powershell Array and pass them on to this command and specify the relevant playbooks.
+Finally `Invoke-AzHunterPlaybook` can, be used standalone. If you have an export of UnifiedAuditLog records, you can load them into a Powershell Array and pass them on to this command and specify the relevant playbooks.
 
 ### Example 1 | Run search on Azure UnifiedAuditLog and extract records to CSV file (default behaviour)
 
@@ -96,15 +96,33 @@ We assume that you have exported UnifiedAuditLog records to a CSV file, if so yo
 
 ```powershell
 $RecordArray = Import-Csv .\my-exported-records.csv
-Invoke-HuntAzureAuditLogs -Records $RecordArray -Playbooks 'AzHunter.Playbook.LogonAnalyser'
+Invoke-AzHunterPlaybook -Records $RecordArray -Playbooks 'AzHunter.Playbook.UAL.LogonAnalyser'
 ```
 
 You can run more than one playbook by separating them via commas, they will run sequentially:
 
 ```powershell
 $RecordArray = Import-Csv .\my-exported-records.csv
-Invoke-HuntAzureAuditLogs -Records $RecordArray -Playbooks 'AzHunter.Playbook.Exporter', 'AzHunter.Playbook.LogonAnalyser'
+Invoke-AzHunterPlaybook -Records $RecordArray -Playbooks 'AzHunter.Playbook.UAL.Exporter', 'AzHunter.Playbook.UAL.LogonAnalyser'
 ```
+
+### Example 3 | Run Hunting Playbook to produce a clean eDiscovery Summary Report
+
+We assume that you have exported an eDiscovery Summary Report to a CSV file, if so you can then do: 
+
+```powershell
+$eDiscoReportFile = .\eDisco-Summary-Report-PersonOfInterest.csv
+Invoke-AzHunterPlaybook -Records $eDiscoReportFile -Playbooks 'AzHunter.Playbook.eDisco.SummaryReportCleaner'
+```
+
+Optionally we can pass some parameters to the playbook like so: 
+
+```powershell
+$eDiscoReportFile = .\eDisco-Summary-Report-PersonOfInterest.csv
+Invoke-AzHunterPlaybook -Records $eDiscoReportFile -Playbooks 'AzHunter.Playbook.eDisco.SummaryReportCleaner' -PlayBookParameters @{"CsvRecordsBatchSize" = 700}
+```
+
+The paramenter "CsvRecordsBatchSize" will tell the playbook to flush records to disk in batches of 700 records.
 
 ## Why?
 
