@@ -51,7 +51,7 @@ Function Start-AzHunterPlaybook {
             $ScriptPath = [System.IO.DirectoryInfo]::new($pwd)
         }
 
-        $PlaybookName = 'AzHunter.Playbook.RecordTypeExporter'
+        $PlaybookName = 'AzHunter.Playbook.UAL.RecordTypeExporter'
 
         # Initialize Logger
         if(!$Global:Logger){ $Logger = [Logger]::New() }

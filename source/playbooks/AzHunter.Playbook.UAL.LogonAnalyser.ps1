@@ -51,7 +51,7 @@ Function Start-AzHunterPlaybook {
             $ScriptPath = [System.IO.DirectoryInfo]::new($pwd)
         }
 
-        $PlaybookName = 'AzHunter.Playbook.LogonAnalyser'
+        $PlaybookName = 'AzHunter.Playbook.UAL.LogonAnalyser'
 
         # Initialize Logger
         if(!$Global:Logger){ $Logger = [Logger]::New() }
@@ -59,16 +59,10 @@ Function Start-AzHunterPlaybook {
         # *** END: GENERAL *** #
 
         # Configure Output File
-        $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
-        if($Global:Logger) {
-            $ExportFileNameBaseDir = ([System.IO.FileInfo]::new($Global:Logger.LogFileJSON)).Directory.FullName
-            $ExportFileName = "$ExportFileNameBaseDir\$($env:COMPUTERNAME)-azhunter-logonanalyser-$strTimeNow.csv"
-        }
-        else {
-            $ExportFileName = "$($ScriptPath.Parent.FullName)\$($env:COMPUTERNAME)-azhunter-logonanalyser-$strTimeNow.csv"
-        }
-        
-        $Logger.LogMessage("[$PlaybookName] Export File Name set to: $ExportFileName", "INFO", $null, $null)
+        # Create output folder for Playbook inside default parent output folder for this session
+        $PlaybookOutputFolder = New-OutputFolder -FolderName $PlaybookName
+        $AzPlaybookFileName = "$PlaybookOutputFolder\AzHunter.UAL.LogonAnalyser.csv"
+        $Logger.LogMessage("[$PlaybookName] Export File Name set to: $AzPlaybookFileName", "INFO", $null, $null)
     }
 
     PROCESS {
@@ -124,8 +118,8 @@ Function Start-AzHunterPlaybook {
 
         }
 
-        $Logger.LogMessage("[$PlaybookName] Exporting records to file $ExportFileName", "INFO", $null, $null)
-        $AzUserLoggedInRecordsFlattened | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
+        $Logger.LogMessage("[$PlaybookName] Exporting records to file $AzPlaybookFileName", "INFO", $null, $null)
+        $AzUserLoggedInRecordsFlattened | Export-Csv $AzPlaybookFileName -NoTypeInformation -NoClobber -Append
     }
 
     END {

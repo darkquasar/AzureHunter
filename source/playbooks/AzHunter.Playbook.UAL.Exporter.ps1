@@ -51,7 +51,7 @@ Function Start-AzHunterPlaybook {
             $ScriptPath = [System.IO.DirectoryInfo]::new($pwd)
         }
 
-        $PlaybookName = 'AzHunter.Playbook.Exporter'
+        $PlaybookName = 'AzHunter.Playbook.UAL.Exporter'
 
         # Initialize Logger
         if(!$Global:Logger){ $Logger = [Logger]::New() }
@@ -62,18 +62,9 @@ Function Start-AzHunterPlaybook {
         # Create output folder for Playbook inside default parent output folder for this session
         $PlaybookOutputFolder = New-OutputFolder -FolderName $PlaybookName
 
-        $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
+        
         if(!$Global:AzExporterExportFileName) {
-            <#
-            if($Global:Logger) {
-                $ExportFileNameBaseDir = ([System.IO.FileInfo]::new($Global:Logger.LogFileJSON)).Directory.FullName
-                $Global:AzExporterExportFileName = "$ExportFileNameBaseDir\$($env:COMPUTERNAME)-azhunter-exporter-$strTimeNow.csv"
-            }
-            else {
-                $Global:AzExporterExportFileName = "$($ScriptPath.Parent.FullName)\$($env:COMPUTERNAME)-azhunter-exporter-$strTimeNow.csv"
-            }
-            $Logger.LogMessage("[$PlaybookName] Export File Name set to: $Global:AzExporterExportFileName", "INFO", $null, $null)
-            #>
+            $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
             $Global:AzExporterExportFileName = "$PlaybookOutputFolder\AzHunter.UAL.Exporter.$($env:COMPUTERNAME)-$strTimeNow.csv"
         }
         else {
