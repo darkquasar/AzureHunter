@@ -6,6 +6,7 @@ A Powershell module to run threat hunting playbooks on data from Azure and O365 
 
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/G2G57T1K8)
+
 [![CI](https://github.com/darkquasar/AzureHunter/actions/workflows/tag-and-release.yml/badge.svg?branch=main)](https://github.com/darkquasar/AzureHunter/actions/workflows/tag-and-release.yml)
 [![PS Gallery](https://img.shields.io/badge/install-PS%20Gallery-blue.svg)](https://www.powershellgallery.com/packages/AzureHunter/)
 [![Coverage Status](https://coveralls.io/repos/github/darkquasar/AzureHunter/badge.svg?branch=master)](https://coveralls.io/github/darkquasar/AzureHunter?branch=master)
