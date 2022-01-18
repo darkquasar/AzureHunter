@@ -11,7 +11,7 @@ A Powershell module to run threat hunting playbooks on data from Azure and O365 
 [![PS Gallery](https://img.shields.io/badge/install-PS%20Gallery-blue.svg)](https://www.powershellgallery.com/packages/AzureHunter/)
 [![Coverage Status](https://coveralls.io/repos/github/darkquasar/AzureHunter/badge.svg?branch=master)](https://coveralls.io/github/darkquasar/AzureHunter?branch=master)
 [![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat)](http://AzureHunter.readthedocs.io/en/latest/?badge=latest)
-![azurehunter-demo-gif](https://github.com/darkquasar/AzureHunter/blob/5a94c58dbcb83cb2a153e73bebc568f1e3e96c57/media/azurehunter-gif-demo.gif)
+![azurehunter-demo-gif](https://raw.githubusercontent.com/darkquasar/AzureHunter/main/media/azurehunter-gif-demo.gif)
 
 
 ## Getting Started
@@ -164,9 +164,12 @@ For more information
 * [github.com/darkquasar/AzureHunter](https://github.com/darkquasar/AzureHunter)
 * [ThreatHunterz.com](https://threathunterz.com)
 
-## Acknowledgments
+## Acknowledgments & Supporters
 
-Thanks to all the people that support this and other Open Source projects
+Thanks to all the people that support this and other Open Source projects! You are helping guys like me walk *the way of the cyberwarrior* and deliver quality toolcraft to the community :)
+
+
+[![tines-support](https://raw.githubusercontent.com/darkquasar/AzureHunter/main/media/sponsors/Tines-Sponsorship-Badge-Purple.png)](https://www.tines.com/?utm_source=oss&utm_medium=sponsorship&utm_campaign=azurehunter)
 
 
 
