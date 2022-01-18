@@ -164,6 +164,12 @@ For more information
 * [github.com/darkquasar/AzureHunter](https://github.com/darkquasar/AzureHunter)
 * [ThreatHunterz.com](https://threathunterz.com)
 
+## Acknowledgments
+
+Thanks to all the people that support this and other Open Source projects
+
+
+
 ## Credits
 
 * Icon made by [itim2101](https://www.flaticon.com/authors/itim2101) from www.flaticon.com
