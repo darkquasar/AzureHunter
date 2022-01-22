@@ -20,16 +20,65 @@ catch {
 }
 
 $AzureHunterLogo = @'
-                                    _    _             _            
-          /\                       | |  | |           | |           
-         /  \    _____   _ _ __ ___| |__| |_   _ _ __ | |_ ___ _ __ 
-        / /\ \  |_  / | | | '__/ _ \  __  | | | | '_ \| __/ _ \ '__|
-       / ____ \  / /| |_| | | |  __/ |  | | |_| | | | | ||  __/ |   
-      /_/    \_\/___|\__,_|_|  \___|_|  |_|\__,_|_| |_|\__\___|_|   
-                                                               
-         a powershell framework to run threat hunting playbooks on Azure data
-
-                      ╰(⇀︿⇀)つ-]═───> by Diego Perez (@darkquassar)                                  
+                                                                                                                     
+                                       `           -r????]nnnnnnnnnnn}=                                              
+                                       r~`         z6EOOOONQ#@@@@@@@@#g:                                             
+                                       .Uh=`      ?@BREEOEOEOE8#@@@@@##E_                                            
+                                        'tBZv,   .w8B#g6ObZHPhoVVsHbd%q%]`                                           
+                                          *R##Rwi^:```----'```.--_____,-'`                                           
+                                            :V0####@@###BQEZOOOEOOO0B#@@#BQgEqec(!-                        `._:>r(=  
+                                              `=iXE#@@@@@@@#NOEOERQ####@@@#BBBBBBQQdl<.              ^]Ve560gQQ8s!`  
+                                             .Vn*"`-:^r(i}lVz]]}VKZd0Q#@@@@@#BBBBBBBQB0z~`           ,tB###QQ8m!     
+                                            `j####QWaznn}]v?r*!::,_'``_~|z6#@@#BBBBBBBBQQq^`     `,?tg####Q8m>`      
+                                            ]##########@@@@@@#EEQ##B8R5zx<'`<Vg@##QBBBBBBQQe_`:?z%Q#8X]>6QK>`        
+                                          `i8QQQBB#######@@@BEEOEN#######@@BP?'-i8@#BBBBBBBQ88QOwv~-   -}:           
+                                          r8QQQQQQQQQBB###@BE66EEEE######@@@@@#v``(Q@#QBBBBBBQEr`                    
+                                         >$QQQQQQQQQQQQQQ8QgRbOEEEEEQ#####@8av:`_rz8@@@#BBBBBBQ$:                    
+                                        :EQQQQQQQQQQQQQgDR8Qh!HEEEEO68QZn*_`:|a8@@8q@@@@@#BBBBQd-                    
+                                       _ZQQQQQQQQQQQ80EEE0QH- ~NgNZcr=..!xaQ@#6Jr,:G@@@@@@@#BQQQi                    
+                             ```      _ZQQQQQQQQQQ8REEEER8H-   :<-`=?lmb6m]^=^lH8#@@@@@@@@@@@@#QN_                   
+                         ,ihO80$6m(, `i8QQQQQQQ80REEEEEO$5,   `=(z%NK}<,_~n6#@@@@@@@8]rN@@@@@@@@#<                   
+                       :sQ####QQQQQgV,`(8QQQQ8NEOOOOZti<,`_^]aRRa]^'`:vmD$$B@@@@@@8]`  ]@@@@@@@@@(                   
+                      ^$Q####BQQQQQQQw``j880REEEZti='`,rnq0ZV?=-,<|zb8QQQQQgB@@#m^`,a^ (########B>                   
+                     `GQQ####BQQQQQQQQt_`^X6Gn?!'`,?nKqh]<=!?nKRQQQQQQQQQ###Dt^''rPB#= n#######Q%-                   
+                     `zQQQ###QQQQQQQQ80di``.`"^}hPV?=,~iXRQQQQQQQQQQ###8P]~.'<z8####t _8#####BQ8r                    
+                      _hQQB##QQQQQQgREOG>!?nmh}r:'_*n6QQQQQQQQQQ####%]:`,?nh$#@@@@#B_`o#####QQQn`                    
+                       `^GQ#BQQQQgREEEO6Pz|>__=*]sbOR8QQQQQ###@@#b}' -t8@@BQQB@@@@@i`]####QQQQn`                     
+                       `,*qBBQ80EOOOEEEZ=`!lmdEOOOEO0QQ##@@@8ai!`    `z@@BQQQQ@@@#( }###BQQQN?`                      
+                 `:*}aRB@@@#B8ggg88888m!`lg8Q8QQQQQQB#@#0jr_`:*r******(B#QQQQQ#@Q~ r@@@QQQ8o,                        
+         `,>?]ns5g@@@@@@@@@gsU5dEOZe]:_]8##########Rtr,`-^cZB#####@@@@@#QQQQQQg]`_%@@@BQR},`.                        
+     .>}K6EOEEOOOOg@@@@#Wv:=*(ii*=:>imQ########B%}~`-<lZQ##############QQQQQ8V_`x#@@@#6|-.*PZ,                       
+  'regQBBBQ8$EOEEEO0@#o!rH##QQQ#############Qhr_`=vqQ############@@@@#BQQQQ$r`,E@@@@0?.-i6QQQb-                      
+  }QQBBBBBBBBQ8DE6m}??wB@@@QQQQQB#######BWc^_!iUg############@@@@@@#BBBBBB0<`!O#@@@K.-]$QQQQQ@b.                     
+  'qQBBBBBBBQ$WUzl]JqN#@@@@QQQQQQB###dn^,!]K8###########@@@@@@@@@@#BBBBBBB] ,OQ#@8^`?RBBBQQQ#@@a`                    
+   ,EBBBBBBBBBBBBBQ8D6R#@@#QQQQQ$h(=:?jN###########@@@@@@@@@@@@@@#QBBBBBBE- zQQ8l`,sQBBBBQQQ@@@@a`             a      
+    ~s5bERRREbHUtn}]cz%R#@BQ0U]~,>n%###########@@@@@@@@@@@@@@@@#BBBBBBBBBU``WB$^ !OBBBBBBQQ#@@@@@n                   
+                      _KNb]<:>]K0QQQQ#####@#bb%%%%b%%%%%%%%%%%qXXXXeXXhXXi `WQ? !NQBBBBBBQQ#@@@@@@|                  
+                       -:^cqQ#######B8#@@@#r                                jG`.HQQQQQQBBBB@@@@@@@#^                 
+                     `r5Q#########BgRgQQ##]                                 !] .UQQQQQQQQQ#####@@@@B=                
+                     iQ#########Q0EORQQQ8?                                   `  .XQQQQQQB####BBBBBBQR`               
+                    r8#######BQDOEEE0QQQ]`                                       _qQQQQ#######BBBBBBQV`              
+                   ~g######B8ROEEEOE8QQV`                                         :OQQ##########BBBBBQx              
+                  :R#####Q0EEEEEEEONQQU'                                           ~Q############BQBBBQr             
+                 _d####QDOEEEEEEEEEgQq_                                             h##############QBBB8>            
+                `E##Q0EEEEEEEEEEEEDQq_                                              `h##############BB##Q<           
+                _]]v??????????????|i,                                                'i]}}}}]]]]]]]]}}]]}r`          
+                                                                                                                     
+                                                                                                                     
+                                                                                                                       
+                                                                                                                     
+                                                           _    _             _            
+                                 /\                       | |  | |           | |           
+                                /  \    _____   _ _ __ ___| |__| |_   _ _ __ | |_ ___ _ __ 
+                               / /\ \  |_  / | | | '__/ _ \  __  | | | | '_ \| __/ _ \ '__|
+                              / ____ \  / /| |_| | | |  __/ |  | | |_| | | | | ||  __/ |   
+                             /_/    \_\/___|\__,_|_|  \___|_|  |_|\__,_|_| |_|\__\___|_|   
+                                                                                        
+                                a powershell framework to run threat hunting playbooks on Azure data
+                        
+                                                ╰(⇀︿⇀)つ-]═───> by Diego Perez (@darkquassar)                                                                                                                                          
+                                                                                                                     
+                                                                                                                     
 
 '@
 
