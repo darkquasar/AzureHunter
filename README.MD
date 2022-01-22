@@ -1,6 +1,7 @@
 
 
-# AzureHunter
+![azurehunter-logo](https://raw.githubusercontent.com/darkquasar/AzureHunter/main/media/logo/AzureHunter-01.jpg)
+
 
 A Powershell module to run threat hunting playbooks on data from Azure and O365 for Cloud Forensics purposes.
 
