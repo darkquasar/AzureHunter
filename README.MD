@@ -169,11 +169,6 @@ For more information
 
 Thanks to all the people that support this and other Open Source projects! You are helping guys like me walk *the way of the cyberwarrior* and deliver quality toolcraft to the community :)
 
-
-[![tines-support](https://raw.githubusercontent.com/darkquasar/AzureHunter/main/media/sponsors/Tines-Sponsorship-Badge-Purple-2.png)](https://www.tines.com/?utm_source=oss&utm_medium=sponsorship&utm_campaign=azurehunter)
-
-
-
 ## Credits
 
 * Icon made by [itim2101](https://www.flaticon.com/authors/itim2101) from www.flaticon.com
